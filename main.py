@@ -1,112 +1,122 @@
-import array
-from calendar import c
-from re import S
-import timeit
-from typing import Literal
 import pandas as pd
 from dev_data_source import P_RD, FACT
 import numpy as np
 
-def interpolation(pikets: pd.DataFrame, piket: int, is_start: bool, vol_col: str) -> pd.DataFrame:
-    """Интерполяция объемов на выбранном участке
+
+def calculate_volume(current_start: pd.Series, 
+                     current_finish: pd.Series, 
+                     input_start: pd.Series, 
+                     input_finish: pd.Series, 
+                     vol_per_unit: pd.Series) -> pd.Series:
+    """Вычисление объемов на пересекающихся участках.
+    
+    Args:
+        current_start (pd.Series): начало целевого участка
+        current_finish (pd.Series): конец целевого участка
+        input_start (pd.Series): начало пересекающего участка
+        input_finish (pd.Series): конец пересекающего участка
+        vol_per_unit (pd.Series): объем работ на единицу длины участка.
+
+    Returns:
+        pd.DataFrame:
+            start (float): начало участка
+            finish (float): конец участка
+            volume (float): объем работ на пересеченном участке
+    """
+    start = np.maximum(current_start, input_start)
+    finish = np.minimum(current_finish, input_finish)
+    length = np.maximum(0, finish - start)
+    
+    volume = vol_per_unit * length
+    
+    return pd.DataFrame({
+        'start': start,
+        'finish': finish,
+        'volume': volume
+    })
+
+
+def select_pikets(start: int, finish: int, pikets: pd.DataFrame) -> pd.DataFrame:
+    """Выбор проектных объемов для заданного пикетажного участка.
 
     Args:
-        pikets (pd.DataFrame): пикетажные участки с объемами для интерполяции
-        piket (int): целевой пикет
-        is_start (bool): флаг начала участка
-        vol_col (str): поле объема
-
+        start (int): пикет начала.
+        finish (int): пикет окончания.
+        pikets (pd.DataFrame): таблица с объемом и пикетажными участками.
+            DataFrame fields:
+                'num_con' (object): №кв.
+                'operation_type' (object): тип операции.
+                'picket_start' (float): начало участка.
+                'picket_finish' (float): конец участка.
+                'vol_prd' (float): объем работ по проекту.
+            
     Returns:
-        pd.DataFrame: интерполированные объемы с измененной протяженностью
+        pd.DataFrame: объем работ на заданном пикетажном участке.
     """
+
+    pikets.loc[:, ['input_start', 'input_fin']] = start, finish
     
-    extra_col, picket_col = ['picket_finish', 'picket_start'] if is_start else ['picket_start', 'picket_finish']
+    vol_per_unit = pikets['vol_prd'] / (pikets['picket_finish'] - pikets['picket_start'])
     
-    length = abs(piket - pikets[extra_col])
-    pikets[vol_col] = (pikets[vol_col] / pikets['length']) * length
-    pikets[picket_col] = piket
-    pikets['length'] = length
+    df = calculate_volume(
+        pikets['picket_start'], pikets['picket_finish'], 
+        pikets['input_start'], pikets['input_fin'], 
+        vol_per_unit
+    )
+    df = df.add_suffix('_p', axis=1)
+    pikets = pd.concat([pikets, df], axis=1)
+    mask = pikets['volume_p'] > 0
+    pikets = pikets[mask][['num_con', 'operation_type', 'start_p', 'finish_p', 'volume_p']]
+    
+    return pikets.reset_index(drop=True)
 
-    return pikets
 
 
-def volume_section(start: int, finish: int, data: pd.DataFrame, vol_col: str) -> pd.DataFrame:
-    """Расчет объемов для пикетажного участка
+def add_fact(project: pd.DataFrame, fact: pd.DataFrame) -> pd.DataFrame:
+    """Добавление фактических объемов на выбранные пикетажные участки.
 
     Args:
-        start (int): пикет начала
-        finish (int): пикет окончания
-        data (pd.DataFrame): любая таблица, включающая объемы и пикетажные участки
-        vol_col (str): название поля с объемом
-        
-    Returns:
-        pd.DataFrame: объем работ на заданном пикетажном участке
-    """
-
-    full_sections_filter = (data['picket_start'] >= start) & (data['picket_finish'] <= finish)
-    start_section_filter = (data['picket_start'] < start) & (data['picket_finish'] > start)
-    fin_section_filter = (data['picket_start'] < finish) & (data['picket_finish'] > finish)
-    #TO DO: 4 вариант
-    
-    full_sections = data[full_sections_filter]
-    
-    start_section = data[start_section_filter]
-    fin_section = data[fin_section_filter]
-    
-    start_section = interpolation(start_section, start, True, vol_col)
-    fin_section = interpolation(fin_section, finish, False, vol_col)
-    concated = pd.concat([start_section, full_sections, fin_section])
-
-    return concated
-    
-
-
-def map_fact(project: pd.DataFrame, fact: pd.DataFrame) -> pd.DataFrame:
-    """Подсчет фактических объемов на выбраннных пикетажных участках
-        proj_vol (pd.DataFrame): проектны
-        fact_vol (pd.DataFrame): объем выполненных работ
+        project (pd.DataFrame): пикетажные участки по проекту.
+            start_p (float): начало
+            finish_p (float): конец
+            volume_p (float): объем
+        fact (pd.DataFrame): фактические пикетажные участки.
 
     Returns:
-        pd.Series: поле с фактом работ на пикетажном участке
+        pd.Seies: поле с фактическими объемами работ на выбранных участках
     """
     
-    fact = fact.sort_values(by=['work_name', 'picket_start', 'picket_finish'])
-    project = project.sort_values(by=['work_name', 'picket_start', 'picket_finish'])
+    project['index_p'] = project.index
+    merged = project.merge(fact, how='left', on='operation_type')
     
-    proj_values = project[['work_name', 'picket_start', 'picket_finish', 'vol_prd']].values
-    fact_values = fact[['work_name', 'picket_start', 'picket_finish', 'vol_fact']].values
+    vol_per_unit = merged['vol_fact'] / (merged['picket_finish'] - merged['picket_start'])
     
-    mapped_fact = np.zeros(proj_values.shape[0])
-
-    j = 0
-    for i in range(proj_values.shape[0]):
-        p_work, p_start, p_fin, p_vol = proj_values[i]
-        f_work, f_start, f_fin, f_vol = fact_values[j]
-
-        if p_start >= f_fin or p_fin <= f_start:
-            continue
-        
-        vol_per_unit = f_vol / (f_fin - f_start)
-        
-        start = max(p_start, f_start)
-        finish = min(p_fin, f_fin)
-        length = finish - start
-        
-        mapped_fact[i] += length * vol_per_unit
-        
-        
-            
-            
+    df = calculate_volume(
+        merged['start_p'], merged['finish_p'], 
+        merged['picket_start'], merged['picket_finish'], 
+        vol_per_unit
+    )
+    
+    merged.loc[:, 'merged_fact'] = df['volume']
+    
+    grouped = merged[['index_p', 'merged_fact']].groupby('index_p').sum()
+   
+    return grouped['merged_fact']
+    
+    
 def main():
     input_cost = 1000000
     input_start = 33
     input_fin = 59
+    
+    prd_cols = ['num_con', 'operation_type', 'picket_start', 'picket_finish', 'vol_prd']
+    fact_cols = ['operation_type', 'picket_start', 'picket_finish', 'vol_fact']
+    
+    project_volume = select_pikets(input_start, input_fin, P_RD[prd_cols])
+    
+    project_volume.loc[:, 'volume_f'] = add_fact(project_volume.copy(), FACT[fact_cols])
+    project_volume.loc[:, 'vol_balance'] = project_volume['volume_p'] - project_volume['volume_f'] 
 
-    project_volume = volume_section(input_start, input_fin, P_RD, 'vol_prd')
-    fact_volume = volume_section(input_start, input_fin, FACT, 'vol_fact')
-    
-    full_volume = map_fact(project_volume, fact_volume)
-    
 
 pd.options.mode.copy_on_write = True
     
