@@ -25,13 +25,12 @@ def sort_works(works: np.ndarray):
         
         if c_level > p_level and c_finish > p_finish:
             for n_inx, next_row in enumerate(works[curr_inx:]):
-                n_finish, n_level = next_row[2], next_row[3]
-                if n_level == p_level and n_finish > c_finish:
+                n_start, n_level = next_row[1], next_row[3]
+                if n_level == p_level and n_start < c_finish:
                     works[n_inx + curr_inx][4] = counter
                     works[curr_inx][4] = counter + 1
-                    counter += 2
-                    break
-            
+                    counter += 1
+            counter += 1   
             continue
                 
         works[curr_inx][4] = counter
@@ -48,14 +47,18 @@ if __name__ == '__main__':
         ['ust_kv', 33.0, 50.0, 2],
         ['ust_geotxtl', 33.0, 45.0, 3],
         ['ust_pps', 33.0, 45.0, 4],
-        ['snt_prs', 40.0, 59.0, 1],
+        ['snt_prs', 40.0, 45.0, 1],
+        ['snt_prs', 45.0, 59.0, 1],
+        ['snt_prs', 60.0, 70.0, 1],
         ['ust_geotxtl', 45.0, 59.0, 3],
         ['ust_pps', 45.0, 59.0, 4],
-        ['ust_kv', 50.0, 59.0, 2]]
+        ['ust_kv', 50.0, 59.0, 2],
+        ]
 
     cols = ['operation_type', 'start_p', 'finish_p', 'hierarchy']
 
     df = pd.DataFrame(data, columns=cols).sort_values(['start_p', 'hierarchy'])
+    
     df.loc[:, 'sort_col'] = None
     cols = df.columns.to_list()
     works = df.values
