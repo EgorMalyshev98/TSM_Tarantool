@@ -1,13 +1,19 @@
 import pandas as pd
-from dev_data_source import P_RD, FACT, CONTRACT
 import numpy as np
+from dataclasses import dataclass
 
 
-class VolumeSelector:
-    def __init__(self, prd: pd.DataFrame, fact: pd.DataFrame, contract: pd.DataFrame):
+class OperationSelector:
+    def __init__(self, 
+                 prd: pd.DataFrame, 
+                 fact: pd.DataFrame, 
+                 contract: pd.DataFrame,
+                 hierarchy: pd.DataFrame):
+        
         self.prd = prd
         self.fact_df = fact
         self.contract = contract
+        self.hierarchy = hierarchy
         
     def _select_pikets(self, start: int, finish: int, pikets: pd.DataFrame) -> pd.DataFrame:
         """Выбор проектных объемов для заданного пикетажного участка.
@@ -117,7 +123,7 @@ class VolumeSelector:
         Args:
             project (pd.DataFrame):
                 num_con (object): №КВ
-                vol_balance (float): остаток работ к выполнению
+                vol_remain (float): остаток работ к выполнению
             contract (pd.DataFrame):
                 num_con (object): №КВ
                 price (float): расценка
@@ -125,48 +131,126 @@ class VolumeSelector:
             pd.Series: поле стоимости работ
         """
         merged = project.merge(contract, how='left', on='num_con', validate='many_to_one')
-        cost = merged['price'] * merged['vol_balance']
+        cost = merged['price'] * merged['vol_remain']
         
         return cost
     
+    
+    @staticmethod
+    def _add_sort_key(works: pd.DataFrame) -> pd.Series:
+        """Определение последовательности работ на пикетажных участках
+        Args:
+            works (pd.DataFrame):
+                start_p (float): начало
+                finish_p (float): окончание
+                hierarchy (int): технологический порядок выполнения работ
+
+        Returns:
+            pd.Series: ключ сортировки
+        """
+
+        counter = 0
+        sort_col = np.zeros(works.shape[0])
+        works = works.values
         
+        for curr_inx, curr_row in enumerate(works):
+            
+            if sort_col[curr_inx]:
+                continue
+            
+            if not curr_inx:
+                sort_col[curr_inx] = curr_inx
+                counter += 1
+                continue
+            
+            curr_row = works[curr_inx]
+            prev_row = works[curr_inx - 1]
+            
+            p_finish, p_level = prev_row[1], prev_row[2]
+            c_finish, c_level = curr_row[1], curr_row[2]
+            
+            if c_level > p_level and c_finish > p_finish:
+                for n_inx, next_row in enumerate(works[curr_inx:]):
+                    n_start, n_level = next_row[0], next_row[2]
+                    if n_level == p_level and n_start < c_finish:
+                        sort_col[n_inx + curr_inx] = counter
+                        sort_col[curr_inx] = counter + 1
+                        counter += 1
+                counter += 1   
+                continue
+                    
+            sort_col[curr_inx] = counter
+            counter += 1
+            
+        return pd.Series(sort_col, dtype=int)
+    
     
     def select(self, input_start: float, input_fin: float) -> pd.DataFrame:
-        selected_pikets = self._select_pikets(input_start, input_fin, self.prd.copy())
-        
-        selected_pikets.loc[:, 'volume_f'] = self._add_fact(selected_pikets.copy(), self.fact_df.copy())
-        selected_pikets.loc[:, 'vol_balance'] = selected_pikets['volume_p'] - selected_pikets['volume_f']
-        selected_pikets.loc[:, 'balance_cost'] = self._add_cost(selected_pikets[['num_con', 'vol_balance']], self.contract.copy())
-        
-        print(selected_pikets)
-        
-        return selected_pikets
-            
+        """Выбор планируемых работ на пикетажных участках
 
+        Args:
+            input_start (float): начало участка
+            input_fin (float): окончание участка
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        
+        operations = self._select_pikets(input_start, input_fin, self.prd.copy())
+        
+        operations.loc[:, 'volume_f'] = self._add_fact(operations.copy(), self.fact_df.copy())
+        operations.loc[:, 'vol_remain'] = operations['volume_p'] - operations['volume_f']
+        operations = (operations[operations['vol_remain'] > 0]
+                      .merge(self.hierarchy, how='left', on='operation_type')
+                      .sort_values(['start_p', 'hierarchy'])
+                      .reset_index(drop=True)
+                      )
+        
+        operations.loc[:, 'sort_key'] = self._add_sort_key(operations[['start_p', 'finish_p', 'hierarchy']])
+        operations.loc[:, 'cost_remain'] = self._add_cost(operations[['num_con', 'vol_remain']], self.contract.copy())
+        
+        return operations
     
+
+@dataclass(frozen=True)
+class DataSources:
+    prd: pd.DataFrame
+    fact: pd.DataFrame
+    contract: pd.DataFrame
+    norms: pd.DataFrame
+    hierarchy: pd.DataFrame
+    resources: pd.DataFrame
+        
     
-def main():
+def main(data: DataSources):
     input_cost = 2000000
-    
     input_start = 33
     input_fin = 59
+    num_days = 30
+    
+
+    selector = OperationSelector(data.prd, data.fact, data.contract, data.hierarchy)
+    plan_opers = selector.select(input_start, input_fin)
+    
+    
+
+    
+if __name__ == '__main__':
+    from dev_data_source import P_RD, FACT, CONTRACT, NORMS, TECH_RES, TECHNOLOGY
+    
+    pd.options.mode.copy_on_write = True
     
     prd_cols = ['num_con', 'operation_type', 'picket_start', 'picket_finish', 'vol_prd']
     fact_cols = ['operation_type', 'picket_start', 'picket_finish', 'vol_fact']
     
-    prd = P_RD[prd_cols]
-    fact = FACT[fact_cols]
-    contract = CONTRACT[['num_con', 'price']]
-    
-    selector = VolumeSelector(prd, fact, contract)
-    
-    project = selector.select(input_start, input_fin)
-    
-    
-    
-if __name__ == '__main__':
-
-    pd.options.mode.copy_on_write = True
+    data = DataSources(
+        prd = P_RD[prd_cols],
+        fact = FACT[fact_cols],
+        contract = CONTRACT[['num_con', 'price']],
+        norms = NORMS[['operation_type', 'technique_type', 'num_of_tech', 'workload_1000_units']],
+        hierarchy = TECHNOLOGY[['operation_type', 'hierarchy']],
+        resources = TECH_RES[['technique_type', 'quantity', 'shift_work']]
+    )
         
-    main()
+    main(data)
 
