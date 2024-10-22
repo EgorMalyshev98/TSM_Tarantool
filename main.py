@@ -148,7 +148,6 @@ class OperationSelector:
         Returns:
             pd.Series: ключ сортировки
         """
-
         counter = 0
         sort_col = np.zeros(works.shape[0])
         works = works.values
@@ -206,8 +205,10 @@ class OperationSelector:
                       .reset_index(drop=True)
                       )
         
-        operations.loc[:, 'sort_key'] = self._add_sort_key(operations[['start_p', 'finish_p', 'hierarchy']])
         operations.loc[:, 'cost_remain'] = self._add_cost(operations[['num_con', 'vol_remain']], self.contract.copy())
+        
+        operations.loc[:, 'sort_key'] = self._add_sort_key(operations[['start_p', 'finish_p', 'hierarchy']])
+        operations.sort_values('sort_key', inplace=True)
         
         return operations
     
@@ -226,11 +227,36 @@ def main(data: DataSources):
     input_cost = 2000000
     input_start = 33
     input_fin = 59
-    num_days = 30
+    num_days = 1
     
-
     selector = OperationSelector(data.prd, data.fact, data.contract, data.hierarchy)
     plan_opers = selector.select(input_start, input_fin)
+    
+    print(plan_opers)
+    
+    resources = (data.resources
+                 .copy()
+                 .assign(workload_limit=lambda df: df['quantity'] * 10 * df['shift_work'] * num_days)
+                 .drop(columns=['quantity', 'shift_work'])
+                 )
+    
+    df = data.resources.copy()
+    df.loc[:,'workload_limit'] = df['quantity'] * 10 * df['shift_work'] * num_days
+    df = df.drop(columns=['quantity', 'shift_work'])
+    
+    
+    
+    
+    require_workload = (plan_opers[['sort_key', 'operation_type', 'vol_remain']]
+        .merge(data.norms, how='left', on='operation_type')
+        .merge(resources, how='left', on='technique_type')
+        .assign(require_workload=lambda df: df['vol_remain'] * df['workload_1000_units'] * df['num_of_tech'] / 1000)
+        .drop(columns=['workload_1000_units', 'num_of_tech'])
+        )
+    
+    require_workload.loc[:, 'cum_workload'] = (require_workload
+          .groupby('technique_type')['require_workload']
+          .cumsum())
     
     
 
@@ -251,6 +277,6 @@ if __name__ == '__main__':
         hierarchy = TECHNOLOGY[['operation_type', 'hierarchy']],
         resources = TECH_RES[['technique_type', 'quantity', 'shift_work']]
     )
-        
+    
     main(data)
 
