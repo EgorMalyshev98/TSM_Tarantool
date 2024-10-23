@@ -1,6 +1,6 @@
-import pandas as pd
 from dataclasses import dataclass
 
+import pandas as pd
 
 CONTRACT = pd.read_csv('data_samples/contract.csv', sep='#')
 P_RD = pd.read_csv('data_samples/prd.csv', sep='#')
