@@ -1,8 +1,7 @@
-from main import OperationSelector
+import numpy as np
 import pandas as pd
-import numpy as np  
 
-
+from main import OperationSelector
 
 data = \
     [['snt_prs', 33.0, 40.0, 1],
