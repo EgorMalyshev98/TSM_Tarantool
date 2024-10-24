@@ -11,6 +11,7 @@ repos:
         args: [--fix, .\src\]
       # Run the formatter.
       - id: ruff-format
+        args: [.\src\]
 
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
