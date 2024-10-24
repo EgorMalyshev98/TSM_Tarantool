@@ -26,9 +26,8 @@ class TechRequire:
          .merge(res, how='left', on='technique_type')
          .assign(cum_workload=lambda df: df.groupby('technique_type')['require_workload'].cumsum()))
         
-        last_oper = cum_workload[cum_workload['workload_limit'] < cum_workload['cum_workload']]['sort_key'].min()
+        return cum_workload[cum_workload['workload_limit'] < cum_workload['cum_workload']]['sort_key'].min()
         
-        return last_oper
         
         
     def require_workload(self, operations: pd.DataFrame) -> pd.DataFrame:

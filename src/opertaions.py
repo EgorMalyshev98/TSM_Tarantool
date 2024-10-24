@@ -3,9 +3,9 @@ import pandas as pd
 
 
 class OperationSelector:
-    def __init__(self, 
-                 prd: pd.DataFrame, 
-                 fact: pd.DataFrame, 
+    def __init__(self,
+                 prd: pd.DataFrame,
+                 fact: pd.DataFrame,
                  contract: pd.DataFrame,
                  hierarchy: pd.DataFrame):
         
@@ -37,9 +37,9 @@ class OperationSelector:
         vol_per_unit = pikets['vol_prd'] / (pikets['picket_finish'] - pikets['picket_start'])
         
         df = self._calculate_volume(
-            pikets['picket_start'], pikets['picket_finish'], 
-            pikets['input_start'], pikets['input_fin'], 
-            vol_per_unit
+            pikets['picket_start'], pikets['picket_finish'],
+            pikets['input_start'], pikets['input_fin'],
+            vol_per_unit,
         )
         df = df.add_suffix('_p', axis=1)
         pikets = pd.concat([pikets, df], axis=1)
@@ -50,10 +50,10 @@ class OperationSelector:
             
         
     def _calculate_volume(self,
-                    current_start: pd.Series, 
-                    current_finish: pd.Series, 
-                    input_start: pd.Series, 
-                    input_finish: pd.Series, 
+                    current_start: pd.Series,
+                    current_finish: pd.Series,
+                    input_start: pd.Series,
+                    input_finish: pd.Series,
                     vol_per_unit: pd.Series) -> pd.Series:
         """Вычисление объемов на пересекающихся участках.
         
@@ -79,7 +79,7 @@ class OperationSelector:
         return pd.DataFrame({
             'start': start,
             'finish': finish,
-            'volume': volume
+            'volume': volume,
         })
         
         
@@ -104,9 +104,9 @@ class OperationSelector:
         vol_per_unit = merged['vol_fact'] / (merged['picket_finish'] - merged['picket_start'])
         
         df = self._calculate_volume(
-            merged['start_p'], merged['finish_p'], 
-            merged['picket_start'], merged['picket_finish'], 
-            vol_per_unit
+            merged['start_p'], merged['finish_p'],
+            merged['picket_start'], merged['picket_finish'],
+            vol_per_unit,
         )
         
         merged.loc[:, 'merged_fact'] = df['volume']
@@ -117,7 +117,7 @@ class OperationSelector:
     
     
     def _add_cost(self, project: pd.DataFrame, contract: pd.DataFrame) -> pd.Series:
-        """Добавление стоимости работ 
+        """Добавление стоимости работ
 
         Args:
             project (pd.DataFrame):
@@ -130,9 +130,8 @@ class OperationSelector:
             pd.Series: поле стоимости работ
         """
         merged = project.merge(contract, how='left', on='num_con', validate='many_to_one')
-        cost = merged['price'] * merged['vol_remain']
+        return merged['price'] * merged['vol_remain']
         
-        return cost
     
     
     @staticmethod
@@ -149,7 +148,7 @@ class OperationSelector:
         """
         counter = 0
         sort_col = np.zeros(works.shape[0])
-        works = works.values
+        works = works.to_numpy()
         
         for curr_inx, curr_row in enumerate(works):
             
@@ -161,7 +160,6 @@ class OperationSelector:
                 counter += 1
                 continue
             
-            curr_row = works[curr_inx]
             prev_row = works[curr_inx - 1]
             
             p_finish, p_level = prev_row[1], prev_row[2]
@@ -174,7 +172,7 @@ class OperationSelector:
                         sort_col[n_inx + curr_inx] = counter
                         sort_col[curr_inx] = counter + 1
                         counter += 1
-                counter += 1   
+                counter += 1
                 continue
                     
             sort_col[curr_inx] = counter
@@ -207,6 +205,5 @@ class OperationSelector:
         operations.loc[:, 'cost_remain'] = self._add_cost(operations[['num_con', 'vol_remain']], self.contract.copy())
         
         operations.loc[:, 'sort_key'] = self._add_sort_key(operations[['start_p', 'finish_p', 'hierarchy']])
-        operations.sort_values('sort_key', inplace=True)
+        return operations.sort_values('sort_key')
         
-        return operations

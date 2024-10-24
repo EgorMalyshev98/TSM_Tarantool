@@ -6,7 +6,6 @@ from resources import TechRequire
 
 
 def main(data: DataSources):
-    input_cost = 2000000
     input_areas = [(33, 40), (40, 59)]
     num_days = 1
     is_resource_limit = True
