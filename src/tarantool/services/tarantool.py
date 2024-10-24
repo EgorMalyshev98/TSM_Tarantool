@@ -1,34 +1,37 @@
-import pandas as pd
-from dev_data_source import DataSources, data
-from resources import TechRequire
+from typing import List
 
+import pandas as pd
+
+from tarantool.services.dev_data_source import DataSources, data
 from tarantool.services.operations import OperationSelector
+from tarantool.services.resources import TechRequire
 
 
 class TarantoolService:
-    pass
+    def __init__(self):
+        self.operation_selector = OperationSelector(data.prd, data.fact, data.contract, data.hierarchy)
+        self.tech_require = TechRequire(data.resources, data.norms)
 
+    def _load_data(self, input_areas: List[List[int]]) -> DataSources:
+        # TODO Database query logic
+        return data
 
-def main(data: DataSources):
-    input_areas = [(33, 40), (40, 59)]
-    num_days = 1
-    is_resource_limit = True
+    def _get_operations_plan(self, input_areas: List[List[int]]):
+        opers = pd.concat([self.operation_selector.select(start, finish) for start, finish in input_areas]).reset_index(
+            drop=True
+        )
+        opers.loc[:, "sort_key"] = opers.index
+        return opers
 
-    selector = OperationSelector(data.prd, data.fact, data.contract, data.hierarchy)
-    plan_opers = pd.concat([selector.select(start, finish) for start, finish in input_areas]).reset_index(drop=True)
-    plan_opers.loc[:, "sort_key"] = plan_opers.index
+    def create_plan(self, input_areas: List[List[int]]):
+        opers = self._get_operations_plan(input_areas)
 
-    tech = TechRequire(data.resources, data.norms)
-    req_workload = tech.require_workload(plan_opers[["operation_type", "vol_remain", "sort_key"]])
+        return opers.to_json()
 
-    if is_resource_limit:
-        last_oper = tech.workload_constrain(req_workload, num_days)
-        plan_opers = plan_opers[plan_opers["sort_key"] < last_oper]
+    def create_plan_with_resource_constraint(self, input_areas: List[List[int]], num_days: int):
+        opers = self._get_operations_plan(input_areas)
+        req_workload = self.tech_require.require_workload(opers[["operation_type", "vol_remain", "sort_key"]])
 
-    return plan_opers
+        last_oper = self.tech_require.workload_constrain(req_workload, num_days)
 
-
-if __name__ == "__main__":
-    pd.options.mode.copy_on_write = True
-
-    main(data)
+        return opers[opers["sort_key"] < last_oper].to_json()

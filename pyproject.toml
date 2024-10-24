@@ -4,11 +4,11 @@ line-length = 120
 
 lint.select = ["E", "F", "B", "W", "N", "ASYNC", "S",
 "YTT", "S", "FBT", "A", "COM", "C4", "SIM",
-"PIE", "RET", "SLF", "TCH", "PTH", "FIX", "TD", "PD", "PL"]
+"PIE", "RET", "SLF", "TCH", "PTH", "FIX", "PD", "PL"]
 
 exclude = ["venv", "logs", "__pycache__"]
 
-lint.ignore = ["W293", "S311", "E501", "PLR2004", "PD901", "COM812"]
+lint.ignore = ["W293", "S311", "E501", "PLR2004", "PD901", "COM812", "FIX002"]
 
 
 

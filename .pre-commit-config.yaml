@@ -18,3 +18,5 @@ repos:
     hooks:
       - id: isort
         name: isort (python)
+
+  # TODO: add mypy
