@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SECRET_AUTH = env.get("SECRET_AUTH")
+DEV = env.get("DEV")
 
 
 @dataclass(frozen=True)

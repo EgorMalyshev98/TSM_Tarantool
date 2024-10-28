@@ -40,6 +40,7 @@ lint.ignore = [
     "B008",      # function-call-in-default-argument
     "RUF002",     # ambiguous-unicode-character-docstring
     "RUF012",
+    "COM812",
 ]
 
 

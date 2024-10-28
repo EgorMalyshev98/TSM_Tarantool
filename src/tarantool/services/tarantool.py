@@ -2,9 +2,9 @@ from typing import List
 
 import pandas as pd
 
-from tarantool.services.dev_data_source import DataSources, data
-from tarantool.services.operations import OperationSelector
-from tarantool.services.resources import TechRequire
+from src.tarantool.services.dev_data_source import DataSources, data
+from src.tarantool.services.operations import OperationSelector
+from src.tarantool.services.resources import TechRequire
 
 
 class TarantoolService:

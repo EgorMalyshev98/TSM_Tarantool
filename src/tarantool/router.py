@@ -1,14 +1,21 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from fastapi.security import APIKeyHeader
 
-from log import logger
-from tarantool.models import PlanRequest
-from tarantool.services.tarantool import TarantoolService
+from src.auth.base_config import auth_header, current_verified_user
+from src.auth.models import User
+from src.log import logger
+from src.tarantool.models import PlanRequest
+from src.tarantool.services.tarantool import TarantoolService
 
 router = APIRouter(prefix="/tarantool")
 
 
 @router.post("/plan/")
-def plan(oper_plan: PlanRequest):
+def plan(
+    oper_plan: PlanRequest,
+    user: User = Depends(current_verified_user),
+    auth_header: APIKeyHeader = Depends(auth_header),
+):
     """Получить план работ на заданных участках"""
     logger.debug("рассчитываем план")
     areas = [[area.start, area.finish] for area in oper_plan.areas]
