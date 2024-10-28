@@ -23,7 +23,7 @@ class TechRequire:
         )
 
         cum_workload = require_workload.merge(res, how="left", on="technique_type").assign(
-            cum_workload=lambda df: df.groupby("technique_type")["require_workload"].cumsum()
+            cum_workload=lambda df: df.groupby("technique_type")["require_workload"].cumsum(),
         )
 
         return cum_workload[cum_workload["workload_limit"] < cum_workload["cum_workload"]]["sort_key"].min()

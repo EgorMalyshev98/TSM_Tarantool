@@ -2,14 +2,45 @@
 
 line-length = 120
 
-lint.select = ["E", "F", "B", "W", "N", "ASYNC", "S",
-"YTT", "S", "FBT", "A", "COM", "C4", "SIM",
-"PIE", "RET", "SLF", "TCH", "PTH", "FIX", "PD", "PL"]
+# Selected linting rules
+lint.select = [
+    "E",        # errors: syntax, indentation, etc.
+    "F",        # unused imports, undefined names
+    "B",        # bugbear: common pitfalls, potential bugs
+    "W",        # Warnings: stylistic issues
+    "N",        # Naming: variable/function/class names
+    "ASYNC",    # async issues
+    "S",        # security: flags risky code
+    "FBT",      # boolean
+    "A",        # builtins
+    "COM",      # commas
+    "C4",       # comprehensions
+    "SIM",      # simplify code
+    "PIE",      # flake8-pie
+    "RET",      # returns
+    "SLF",      # flake8-self self/cls usage
+    "TCH",      # flake8-type-checking
+    "PTH",      # path issues
+    "FIX",      # auto-fix common issues
+    "PD",       # pandas
+    "NPY",      # numpy
+    "PL",       # pylint rules
+    "I",        # isort
+    "FAST",     # fastapi
+    "RUF",      # ruff rules
+]
 
+# Excluded directories
 exclude = ["venv", "logs", "__pycache__"]
 
-lint.ignore = ["W293", "S311", "E501", "PLR2004", "PD901", "COM812", "FIX002"]
-
+# Ignored linting rules
+lint.ignore = [
+    "PD901",     # pandas-df-variable-name
+    "FIX002",    # auto-fix TODO
+    "B008",      # function-call-in-default-argument
+    "RUF002",     # ambiguous-unicode-character-docstring
+    "RUF012",
+]
 
 
 [tool.pytest.ini_options]

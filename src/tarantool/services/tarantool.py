@@ -18,7 +18,7 @@ class TarantoolService:
 
     def _get_operations_plan(self, input_areas: List[List[int]]):
         opers = pd.concat([self.operation_selector.select(start, finish) for start, finish in input_areas]).reset_index(
-            drop=True
+            drop=True,
         )
         opers.loc[:, "sort_key"] = opers.index
         return opers

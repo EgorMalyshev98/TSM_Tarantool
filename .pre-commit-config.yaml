@@ -12,11 +12,5 @@ repos:
       # Run the formatter.
       - id: ruff-format
         args: [.\src\]
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        name: isort (python)
-
+             
   # TODO: add mypy

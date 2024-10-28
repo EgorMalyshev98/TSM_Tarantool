@@ -79,7 +79,7 @@ class OperationSelector:
                 "start": start,
                 "finish": finish,
                 "volume": volume,
-            }
+            },
         )
 
     def _add_fact(self, project: pd.DataFrame, fact: pd.DataFrame) -> pd.Series:
