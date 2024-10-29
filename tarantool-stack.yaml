@@ -7,7 +7,7 @@ services:
     environment:
       - ROOT_PATH=/tarantool
 
-    env_file: .env
+    env_file: /home/odmin/env/.env-tarantool
     ports:
       - "8827:8827"
     networks:
