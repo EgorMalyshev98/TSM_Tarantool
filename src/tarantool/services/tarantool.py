@@ -26,7 +26,7 @@ class TarantoolService:
     def create_plan(self, input_areas: List[List[int]]):
         opers = self._get_operations_plan(input_areas)
 
-        return opers.to_json()
+        return {"columns": opers.columns.to_list(), "data": opers.to_json(orient="values")}
 
     def create_plan_with_resource_constraint(self, input_areas: List[List[int]], num_days: int):
         opers = self._get_operations_plan(input_areas)
@@ -35,6 +35,6 @@ class TarantoolService:
         last_oper = self.tech_require.workload_constrain(req_workload, num_days)
 
         return {
-            "columns": opers.columns.tolist(),
+            "columns": opers.columns.to_list(),
             "data": opers[opers["sort_key"] < last_oper].to_json(orient="values"),
         }
