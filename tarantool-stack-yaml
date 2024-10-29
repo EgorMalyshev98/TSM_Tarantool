@@ -1,0 +1,20 @@
+version: "3.7"
+
+services:
+
+  tarantool:
+    image: tarantool:1
+    environment:
+      - ROOT_PATH=/tarantool
+
+    env_file: .env
+    ports:
+      - "8827:8827"
+    networks:
+      - superset_superset
+    command:  ["fastapi", "run", "src/main.py", "--port", "8827", "--host", "0.0.0.0"]
+
+networks:
+  superset_superset:
+    external: true
+

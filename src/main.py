@@ -3,8 +3,9 @@ from fastapi import FastAPI
 from src.auth.base_config import auth_backend, fastapi_users
 from src.auth.schemas import UserCreate, UserRead
 from src.tarantool.router import router as tarantool_router
+from os import environ as env
 
-app = FastAPI(title="TSM_Tarantool", root_path="/ver1")
+app = FastAPI(title="TSM_Tarantool", root_path=env.get("ROOT_PATH"))
 
 app.include_router(tarantool_router)
 app.include_router(
