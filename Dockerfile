@@ -15,4 +15,6 @@ WORKDIR /app/
 
 RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org --no-cache-dir -r requirements.txt 
 
+COPY ["./data_samples/", "/app/data_samples/"]
+
 COPY ["./src/", "/app/src/"]
