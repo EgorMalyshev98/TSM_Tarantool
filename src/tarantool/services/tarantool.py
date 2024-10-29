@@ -34,4 +34,7 @@ class TarantoolService:
 
         last_oper = self.tech_require.workload_constrain(req_workload, num_days)
 
-        return opers[opers["sort_key"] < last_oper].to_json()
+        return {
+            "columns": opers.columns.tolist(),
+            "data": opers[opers["sort_key"] < last_oper].to_json(orient="values"),
+        }
