@@ -13,4 +13,5 @@ deploy-job:      # This job runs in the deploy stage.
   stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
   environment: production
   script:
+    - docker stack rm tarantool
     - docker stack deploy -c tarantool-stack.yaml tarantool
