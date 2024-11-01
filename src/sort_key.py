@@ -1,73 +1,105 @@
-import numpy as np
+from collections import deque
+from typing import Dict, List
+
 import pandas as pd
 
-
-def add_sort_key(works: pd.DataFrame) -> pd.Series:
-    """Определение последовательности работ на пикетажных участках
-    Args:
-        works (pd.DataFrame):
-            start_p (float): начало
-            finish_p (float): окончание
-            hierarchy (int): технологический порядок выполнения работ
-
-    Returns:
-        pd.Series: ключ сортировки
-    """
-    counter = 0
-    sort_col = np.zeros(works.shape[0])
-    works = works.to_numpy()
-
-    for curr_inx, curr_row in enumerate(works):
-        if sort_col[curr_inx]:
-            continue
-
-        if not curr_inx:
-            sort_col[curr_inx] = curr_inx
-            counter += 1
-            continue
-
-        prev_row = works[curr_inx - 1]
-
-        p_finish, p_level = prev_row[1], prev_row[2]
-        c_finish, c_level = curr_row[1], curr_row[2]
-
-        if c_level > p_level and c_finish > p_finish:
-            for n_inx, next_row in enumerate(works[curr_inx:]):
-                n_start, n_finish, n_level = next_row[0], next_row[1], next_row[2]
-                if n_level > c_level and n_start < c_finish and n_finish > c_finish:
-                    sort_col[n_inx + curr_inx] = -1
-                    continue
-                if n_level == p_level and n_start < c_finish:
-                    sort_col[n_inx + curr_inx] = counter
-                    sort_col[curr_inx] = counter + 1
-                    counter += 1
-            counter += 1
-            continue
-
-        sort_col[curr_inx] = counter
-        counter += 1
-
-    return pd.Series(sort_col, dtype=int)
-
-
 data = [
-    ["snt_prs", 33.0, 40.0, 1],
-    ["ust_nasp", 33.0, 50.0, 2],
-    ["ust_kv", 33.0, 50.0, 2],
-    ["ust_geotxtl", 33.0, 45.0, 3],
-    ["ust_pps", 33.0, 45.0, 4],
-    ["snt_prs", 40.0, 45.0, 1],
-    ["snt_prs", 45.0, 59.0, 1],
-    ["snt_prs", 60.0, 70.0, 1],
-    ["ust_geotxtl", 45.0, 59.0, 3],
-    ["ust_pps", 45.0, 59.0, 4],
-    ["ust_kv", 50.0, 59.0, 2],
+    [1, 10, 20],
+    [1, 20, 30],
+    [1, 30, 40],
+    [2, 10, 25],
+    [2, 28, 37],
+    [3, 10, 30],
+    [3, 30, 37],
+    [4, 10, 29],
+    [4, 30, 37],
 ]
 
 
-cols = ["operation_type", "start_p", "finish_p", "hierarchy"]
-df = pd.DataFrame(data, columns=cols).sort_values(["start_p", "hierarchy"]).reset_index(drop=True)
+cols = ["hierarchy", "start_p", "finish_p"]
+df = pd.DataFrame(data, columns=cols).sort_values(["hierarchy", "start_p"]).reset_index(drop=True)
+blocks: Dict[int, deque] = (
+    df.groupby("hierarchy")[["start_p", "finish_p"]].apply(lambda x: deque(x.to_numpy().tolist())).to_dict()
+)
 
-df.loc[:, "sort_key"] = add_sort_key(df[["start_p", "finish_p", "hierarchy"]])
+# {1: deque([[10, 20], [20, 30], [30, 40]]),
+#  2: deque([[10, 25], [28, 37]]),
+#  3: deque([[10, 30], [30, 37]]),
+#  4: deque([[10, 29], [30, 37]])}
 
-print(df)
+
+class Wall:
+    def __init__(self):
+        self.wall = []
+        self.merged_blocks_per_layer: Dict[int, List[List]] = {}
+        self.counter = 1
+        self.added_blocks = set()
+
+    def _merge_block(self, block: list, lvl: int):
+        if not self.merged_blocks_per_layer.get(lvl):
+            self.merged_blocks_per_layer[lvl] = [block]
+            return
+
+        prev_block = self.merged_blocks_per_layer[lvl][-1]
+        start, finish = block
+        _, prev_finish = prev_block
+
+        if prev_finish == start:
+            self.merged_blocks_per_layer[lvl][-1][1] = finish
+            return
+
+        self.merged_blocks_per_layer[lvl].append(block)
+
+    def add_block(self, block: list, lvl: int):
+        if (lvl, *block) in self.added_blocks:
+            return
+        self.added_blocks.add((lvl, *block))
+        self._merge_block(block, lvl)
+        self.wall.append([self.counter, lvl, *block])
+        self.counter += 1
+
+    def is_valid(self, block: list, lvl: int):
+        if lvl == 1:
+            return True
+
+        layer = wall.merged_blocks_per_layer[lvl - 1]
+        start, finish = block
+
+        for prev_block in layer:
+            prev_start, prev_fin = prev_block
+            if start >= prev_start and finish <= prev_fin:
+                return True
+
+        return False
+
+    def __str__(self):
+        return str(self.wall)
+
+
+wall = Wall()
+
+
+def backtracking(lvl=1):
+    if lvl not in blocks:
+        return
+
+    lvl_blocks = blocks[lvl]
+
+    if not lvl_blocks:
+        return
+
+    block = lvl_blocks.popleft()
+
+    is_valid = wall.is_valid(block, lvl)
+
+    if is_valid:
+        wall.add_block(block, lvl)
+        backtracking(lvl + 1)
+
+    backtracking(lvl)
+    lvl_blocks.appendleft(block)
+
+
+backtracking()
+
+print(wall)
