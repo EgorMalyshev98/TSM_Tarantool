@@ -11,6 +11,18 @@ class TarantoolService:
     def __init__(self):
         self.operation_selector = OperationSelector(data.prd, data.fact, data.contract, data.hierarchy)
         self.tech_require = TechRequire(data.resources, data.norms)
+        self.cols = [
+            "num_con",
+            "operation_type",
+            "start_p",
+            "finish_p",
+            "volume_p",
+            "volume_f",
+            "vol_remain",
+            "hierarchy",
+            "cost_remain",
+            "sort_key",
+        ]
 
     def _load_data(self, input_areas: List[List[int]]) -> DataSources:
         # TODO Database query logic
@@ -21,7 +33,7 @@ class TarantoolService:
             drop=True,
         )
         opers.loc[:, "sort_key"] = opers.index
-        return opers
+        return opers[self.cols]
 
     def create_plan(self, input_areas: List[List[int]]):
         opers = self._get_operations_plan(input_areas)
