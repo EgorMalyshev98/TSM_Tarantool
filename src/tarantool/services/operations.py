@@ -1,5 +1,109 @@
+from typing import Dict, List
+
 import numpy as np
 import pandas as pd
+
+
+class Wall:
+    def __init__(self, blocks: Dict[int, List[List[int]]], slice_=2):
+        self.values = []
+        self.merged_blocks_per_layer: Dict[int, List[List]] = {}
+        self.spaces: Dict[int, List[List]] = {}
+        self.added_blocks = set()
+        self.blocks = blocks
+        self.slice_ = slice_
+
+    def _merge_block(self, block: list, lvl: int):
+        layer = self.merged_blocks_per_layer.get(lvl)
+        if not layer:
+            self.merged_blocks_per_layer[lvl] = [block[: self.slice_]]
+            return
+
+        prev_block = self.merged_blocks_per_layer[lvl][-1]
+        start, finish = block[: self.slice_]
+        _, prev_finish = prev_block
+
+        if prev_finish == start:
+            self.merged_blocks_per_layer[lvl][-1][1] = finish
+            return
+
+        self.merged_blocks_per_layer[lvl].append(block[: self.slice_])
+        self.spaces.setdefault(lvl, []).append([prev_finish, start])
+
+    def _add_block(self, block: list, lvl: int):
+        if (lvl, *block) in self.added_blocks:
+            return
+
+        self.added_blocks.add((lvl, *block))
+
+        self._merge_block(block, lvl)
+
+        self.values.append([lvl, *block])
+
+    def _is_valid(self, block: list, lvl: int):
+        if lvl == 1:
+            return True
+
+        layer = self.merged_blocks_per_layer[lvl - 1]
+        start, finish = block[: self.slice_]
+
+        for prev_block in layer:
+            prev_start, prev_fin = prev_block[: self.slice_]
+
+            if start >= prev_fin:
+                return True
+            if start >= prev_start and finish <= prev_fin:
+                return True
+
+        return False
+
+    def _is_over_space(self, block: list, lvl: int):
+        layer = self.spaces.get(lvl - 1)
+        if not layer:
+            return False
+
+        start, finish = block[: self.slice_]
+
+        for space in layer:
+            space_start, space_finish = space
+            if space_start < finish and start < space_finish:
+                self.spaces.setdefault(lvl, []).append([start, finish])
+                return True
+
+        return False
+
+    def build(self):
+        levels = sorted(self.blocks.keys())
+        lvl = levels[0]
+        max_lvl = levels[-1]
+
+        while any(block for levels in self.blocks.values() for block in levels):
+            if lvl not in levels:
+                return self.values
+
+            if not self.blocks[lvl]:
+                if lvl == levels[0]:
+                    return self.values
+                lvl -= 1
+                continue
+
+            block = self.blocks[lvl].pop()
+            is_valid = self._is_valid(block, lvl)
+
+            if is_valid:
+                self._add_block(block, lvl)
+                if lvl + 1 < max_lvl:
+                    lvl += 1
+                continue
+
+            is_over_space = self._is_over_space(block, lvl)
+            if is_over_space:
+                continue
+
+            self.blocks[lvl].append(block)
+            lvl -= 1
+
+        return self.values
 
 
 class OperationSelector:
@@ -129,49 +233,27 @@ class OperationSelector:
         return merged["price"] * merged["vol_remain"]
 
     @staticmethod
-    def _add_sort_key(works: pd.DataFrame) -> pd.Series:
+    def _sort_by_technology(works: pd.DataFrame) -> pd.Series:
         """Определение последовательности работ на пикетажных участках
         Args:
             works (pd.DataFrame):
-                start_p (float): начало
-                finish_p (float): окончание
-                hierarchy (int): технологический порядок выполнения работ
 
         Returns:
             pd.Series: ключ сортировки
         """
-        counter = 0
-        sort_col = np.zeros(works.shape[0])
-        works = works.to_numpy()
 
-        for curr_inx, curr_row in enumerate(works):
-            if sort_col[curr_inx]:
-                continue
+        cols = ["start_p", "finish_p", "volume_p", "num_con", "operation_type"]
+        blocks: Dict[int, list] = (
+            works.sort_values(["hierarchy", "start_p"], ascending=[True, False])
+            .reset_index(drop=True)
+            .groupby("hierarchy")[cols]
+            .apply(lambda x: x.to_numpy().tolist())
+            .to_dict()
+        )
 
-            if not curr_inx:
-                sort_col[curr_inx] = curr_inx
-                counter += 1
-                continue
+        wall = Wall(blocks).build()
 
-            prev_row = works[curr_inx - 1]
-
-            p_finish, p_level = prev_row[1], prev_row[2]
-            c_finish, c_level = curr_row[1], curr_row[2]
-
-            if c_level > p_level and c_finish > p_finish:
-                for n_inx, next_row in enumerate(works[curr_inx:]):
-                    n_start, n_level = next_row[0], next_row[2]
-                    if n_level == p_level and n_start < c_finish:
-                        sort_col[n_inx + curr_inx] = counter
-                        sort_col[curr_inx] = counter + 1
-                        counter += 1
-                counter += 1
-                continue
-
-            sort_col[curr_inx] = counter
-            counter += 1
-
-        return pd.Series(sort_col, dtype=int)
+        return pd.DataFrame(wall, columns=["hierarchy", *cols]).reset_index(names="sort_key")
 
     def select(self, input_start: float, input_fin: float) -> pd.DataFrame:
         """Выбор планируемых работ на пикетажных участках
@@ -184,18 +266,14 @@ class OperationSelector:
             pd.DataFrame: _description_
         """
 
-        operations = self._select_pikets(input_start, input_fin, self.prd.copy())
+        operations = self._select_pikets(input_start, input_fin, self.prd.copy()).merge(
+            self.hierarchy, how="left", on="operation_type"
+        )
+
+        operations = self._sort_by_technology(operations)
 
         operations.loc[:, "volume_f"] = self._add_fact(operations.copy(), self.fact_df.copy())
         operations.loc[:, "vol_remain"] = operations["volume_p"] - operations["volume_f"]
-        operations = (
-            operations[operations["vol_remain"] > 0]
-            .merge(self.hierarchy, how="left", on="operation_type")
-            .sort_values(["start_p", "hierarchy"])
-            .reset_index(drop=True)
-        )
-
         operations.loc[:, "cost_remain"] = self._add_cost(operations[["num_con", "vol_remain"]], self.contract.copy())
 
-        operations.loc[:, "sort_key"] = self._add_sort_key(operations[["start_p", "finish_p", "hierarchy"]])
-        return operations.sort_values("sort_key")
+        return operations[operations["vol_remain"] > 0]
