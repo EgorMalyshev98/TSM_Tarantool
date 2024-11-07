@@ -22,7 +22,7 @@ class Statement:
 
             csv_buffer.seek(0)
             cur.execute(f"TRUNCATE {table.name}")
-            cur.copy_from(csv_buffer, table.name, sep="\t")
+            cur.copy_from(csv_buffer, table.name, columns=table.columns, sep="\t")
             raw_conn.commit()
 
         except Exception as e:
