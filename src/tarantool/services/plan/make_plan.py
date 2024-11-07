@@ -34,13 +34,25 @@ class TarantoolService:
     def __init__(self, data: PlanSources):
         self.operation_selector = OperationSelector(data)
         self.tech_require = TechRequire(data)
+        self.cols = [
+            "num_con",
+            "operation_type",
+            "start_p",
+            "finish_p",
+            "volume_p",
+            "volume_f",
+            "vol_remain",
+            "hierarchy",
+            "cost_remain",
+            "sort_key",
+        ]
 
     def _get_operations_plan(self, input_areas: List[List[int]]):
         opers = pd.concat([self.operation_selector.select(start, finish) for start, finish in input_areas]).reset_index(
             drop=True,
         )
         opers.loc[:, "sort_key"] = opers.index
-        return opers
+        return opers[self.cols]
 
     def create_plan(self, input_areas: List[List[int]]):
         opers = self._get_operations_plan(input_areas)
