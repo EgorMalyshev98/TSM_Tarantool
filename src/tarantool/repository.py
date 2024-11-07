@@ -130,7 +130,7 @@ class Query:
 
         return self._get_data(query, params)
 
-    def _get_data(self, query: str, query_params: Optional[dict[str, Any]]) -> pd.DataFrame:
+    def _get_data(self, query: str, query_params: Optional[dict[str, Any]] = None) -> pd.DataFrame:
         query = text(query)
         result = self.db.execute(query, query_params)
         data = result.all()
