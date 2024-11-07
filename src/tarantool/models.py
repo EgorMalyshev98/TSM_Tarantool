@@ -1,5 +1,7 @@
+from dataclasses import dataclass
 from typing import Any, List
 
+import pandas as pd
 from pydantic import BaseModel
 
 
@@ -17,3 +19,13 @@ class PlanRequest(BaseModel):
 class PlanResponse(BaseModel):
     oper_plan: Any
     res_plan: Any
+
+
+@dataclass(frozen=True)
+class PlanSources:
+    prd: pd.DataFrame
+    fact: pd.DataFrame
+    contract: pd.DataFrame
+    norms: pd.DataFrame
+    hierarchy: pd.DataFrame
+    resources: pd.DataFrame

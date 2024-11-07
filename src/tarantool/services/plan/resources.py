@@ -1,10 +1,12 @@
 import pandas as pd
 
+from src.tarantool.models import PlanSources
+
 
 class TechRequire:
-    def __init__(self, resources: pd.DataFrame, norms: pd.DataFrame):
-        self.resources = resources
-        self.norms = norms
+    def __init__(self, data: PlanSources):
+        self.resources = data.resources
+        self.norms = data.norms
 
     def workload_constrain(self, require_workload: pd.DataFrame, num_days: int):
         """
