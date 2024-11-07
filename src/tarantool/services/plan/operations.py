@@ -3,6 +3,8 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
+from src.tarantool.models import PlanSources
+
 
 class Wall:
     def __init__(self, blocks: Dict[int, List[List[int]]], slice_=2):
@@ -107,11 +109,11 @@ class Wall:
 
 
 class OperationSelector:
-    def __init__(self, prd: pd.DataFrame, fact: pd.DataFrame, contract: pd.DataFrame, hierarchy: pd.DataFrame):
-        self.prd = prd
-        self.fact_df = fact
-        self.contract = contract
-        self.hierarchy = hierarchy
+    def __init__(self, data: PlanSources):
+        self.prd = data.prd
+        self.fact_df = data.fact
+        self.contract = data.contract
+        self.hierarchy = data.hierarchy
 
     def _select_pikets(self, start: int, finish: int, pikets: pd.DataFrame) -> pd.DataFrame:
         """Выбор проектных объемов для заданного пикетажного участка.

@@ -5,7 +5,7 @@ from src.auth.base_config import auth_header, current_verified_user
 from src.auth.models import User
 from src.log import logger
 from src.tarantool.models import PlanRequest
-from src.tarantool.services.tarantool import TarantoolService
+from src.tarantool.services.plan.make_plan import LoaderService, TarantoolService
 
 router = APIRouter(prefix="/tarantool")
 
@@ -23,7 +23,15 @@ def plan(
 
     is_res_limit = oper_plan.is_resource_limit
 
-    if is_res_limit:
-        return TarantoolService().create_plan_with_resource_constraint(areas, num_days)
+    data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
+    service = TarantoolService(data)  # TODO Dependency injection
 
-    return TarantoolService().create_plan(areas)
+    if is_res_limit:
+        return service.create_plan_with_resource_constrain(areas, num_days)
+
+    return service.create_plan(areas)
+
+
+@router.post("/upload/")
+def load_data(user: User = Depends(current_verified_user), auth_header=Depends(auth_header)):
+    return {"data": "batch"}

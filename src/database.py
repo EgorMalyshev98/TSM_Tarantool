@@ -1,6 +1,6 @@
 from typing import AsyncGenerator, Generator
 
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Session, declarative_base, registry, sessionmaker
 
@@ -51,3 +51,8 @@ async_session_maker = sessionmaker(async_engine, class_=AsyncSession, expire_on_
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
+
+
+if __name__ == "__main__":
+    with SessionLocal() as session:
+        session.execute(text("SELECT 1"))
