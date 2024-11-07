@@ -19,10 +19,21 @@ class LoaderService:
             PlanSources
         """
         query = Query()
+        prd = (
+            pd.concat([query.get_prd(start, finish) for start, finish in input_areas])
+            .drop_duplicates("id")
+            .reset_index(drop=True)
+        )
+
+        fact = (
+            pd.concat([query.get_fact(start, finish) for start, finish in input_areas])
+            .drop_duplicates("id")
+            .reset_index(drop=True)
+        )
 
         return PlanSources(
-            prd=pd.concat([query.get_prd(start, finish) for start, finish in input_areas]),
-            fact=pd.concat([query.get_fact(start, finish) for start, finish in input_areas]),
+            prd=prd,
+            fact=fact,
             contract=query.get_contract(),
             hierarchy=query.get_technology(),
             norms=query.get_norm(),
@@ -72,4 +83,10 @@ class TarantoolService:
 
 
 if __name__ == "__main__":
-    print(LoaderService.get_plan_source_data([[33, 59], [70, 80]]))
+    query = Query()
+    areas = [[0, 45], [45, 50]]
+    data = LoaderService.get_plan_source_data(areas)
+
+    plan = TarantoolService(data).create_plan(areas)
+
+    print(data.prd, pd.DataFrame(plan["data"], columns=plan["columns"]), sep="\n")

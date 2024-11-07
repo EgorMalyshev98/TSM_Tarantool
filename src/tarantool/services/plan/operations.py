@@ -278,4 +278,4 @@ class OperationSelector:
         operations.loc[:, "vol_remain"] = operations["volume_p"] - operations["volume_f"]
         operations.loc[:, "cost_remain"] = self._add_cost(operations[["num_con", "vol_remain"]], self.contract.copy())
 
-        return operations[operations["vol_remain"] > 0]
+        return operations

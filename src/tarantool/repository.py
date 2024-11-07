@@ -14,6 +14,7 @@ class Query:
     def get_prd(self, start: int, finish: int):
         query = """
             SELECT
+                id,
                 num_prd,
                 operation_type,
                 num_con,
@@ -102,6 +103,7 @@ class Query:
     def get_fact(self, start: int, finish: int):
         query = """
             SELECT
+                id,
                 operation_type,
                 ispol,
                 num_con,
