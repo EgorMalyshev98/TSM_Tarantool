@@ -2,6 +2,8 @@ import io
 from typing import Any, Optional
 
 import pandas as pd
+from fastapi import HTTPException
+from psycopg2.errors import UndefinedColumn
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -22,8 +24,12 @@ class Statement:
 
             csv_buffer.seek(0)
             cur.execute(f"TRUNCATE {table.name}")
-            cur.copy_from(csv_buffer, table.name, columns=table.columns, sep="\t")
+            cur.copy_from(csv_buffer, table.name, columns=table.columns, sep="\t", null="")
             raw_conn.commit()
+
+        except UndefinedColumn as e:
+            logger.log(e)
+            raise HTTPException(422, detail=e) from e
 
         except Exception as e:
             logger.error(e)

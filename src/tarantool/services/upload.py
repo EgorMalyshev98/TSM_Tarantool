@@ -3,6 +3,8 @@ from src.tarantool.repository import Statement
 
 
 class UploadService:
-    def upload_table(self: UploadTable):
+    @staticmethod
+    def upload_table(table: UploadTable):
         stmt = Statement()
-        stmt.upsert_copy_from(self)
+        # table.rows = pd.DataFrame(table.rows).replace("", None).to_numpy().tolist()
+        stmt.upsert_copy_from(table)
