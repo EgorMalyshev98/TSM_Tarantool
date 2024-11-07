@@ -8,6 +8,8 @@ load_dotenv()
 SECRET_AUTH = env.get("SECRET_AUTH")
 DEV = env.get("DEV")
 
+SCHEMA = env.get("SCHEMA")
+
 
 @dataclass(frozen=True)
 class DBConfig:

@@ -1,10 +1,38 @@
+import io
 from typing import Any, Optional
 
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from src.database import get_session
+from src.database import engine, get_session
+from src.log import logger
+from src.tarantool.models import UploadTable
+
+
+class Statement:
+    def upsert_copy_from(self, table: UploadTable):
+        csv_buffer = io.StringIO()
+        raw_conn = engine.raw_connection()
+        cur = raw_conn.cursor()
+        try:
+            for row in table.rows:
+                s_row = "\t".join(map(str, row)) + "\n"
+                csv_buffer.write(s_row)
+
+            csv_buffer.seek(0)
+            cur.execute(f"TRUNCATE {table.name}")
+            cur.copy_from(csv_buffer, table.name, sep="\t")
+            raw_conn.commit()
+
+        except Exception as e:
+            logger.error(e)
+            raw_conn.rollback()
+            raise
+
+        finally:
+            cur.close()
+            raw_conn.close()
 
 
 class Query:

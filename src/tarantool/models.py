@@ -21,6 +21,12 @@ class PlanResponse(BaseModel):
     res_plan: Any
 
 
+class UploadTable(BaseModel):
+    name: str
+    columns: List[str]
+    rows: List[List[Any]]
+
+
 @dataclass(frozen=True)
 class PlanSources:
     prd: pd.DataFrame
