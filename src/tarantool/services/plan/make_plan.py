@@ -76,6 +76,12 @@ class TarantoolService:
 
         last_oper = self.tech_require.workload_constrain(req_workload, num_days)
 
+        if not last_oper:
+            return {
+                "columns": opers.columns.to_list(),
+                "data": opers.to_numpy().tolist(),
+            }
+
         return {
             "columns": opers.columns.to_list(),
             "data": opers[opers["sort_key"] < last_oper].to_numpy().tolist(),
@@ -84,9 +90,8 @@ class TarantoolService:
 
 if __name__ == "__main__":
     query = Query()
-    areas = [[0, 45], [45, 50]]
+
+    areas = [[9775.42, 9800]]
     data = LoaderService.get_plan_source_data(areas)
 
     plan = TarantoolService(data).create_plan(areas)
-
-    print(data.prd, pd.DataFrame(plan["data"], columns=plan["columns"]), sep="\n")

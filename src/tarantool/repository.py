@@ -153,13 +153,13 @@ class Query:
                 picket_finish >= (
                     SELECT min(picket_finish)
                     FROM tarantool.dev_app__prd dap
-                    WHERE picket_finish >= 33
+                    WHERE picket_finish >= :start
                 )
                 AND
                 picket_start <= (
                     SELECT max(picket_start)
                     FROM tarantool.dev_app__prd dap
-                    WHERE picket_start <= 85
+                    WHERE picket_start <= :finish
                 )
         """
         params = {"start": start, "finish": finish}

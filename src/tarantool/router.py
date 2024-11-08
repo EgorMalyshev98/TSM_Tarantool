@@ -1,3 +1,4 @@
+import pandas as pd
 from fastapi import APIRouter, Depends
 from fastapi.security import APIKeyHeader
 
@@ -24,11 +25,13 @@ def plan(
 
     data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
     service = TarantoolService(data)  # TODO Dependency injection
-
     if is_res_limit:
         return service.create_plan_with_resource_constrain(areas, num_days)
 
-    return service.create_plan(areas)
+    plan = service.create_plan(areas)
+    print(data.prd, data.fact, pd.DataFrame(plan["data"], columns=plan["columns"]), sep="\n")
+
+    return plan
 
 
 @router.post("/upload/")
