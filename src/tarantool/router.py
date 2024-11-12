@@ -1,4 +1,3 @@
-import pandas as pd
 from fastapi import APIRouter, Depends
 from fastapi.security import APIKeyHeader
 
@@ -28,10 +27,7 @@ def plan(
     if is_res_limit:
         return service.create_plan_with_resource_constrain(areas, num_days)
 
-    plan = service.create_plan(areas)
-    print(data.prd, data.fact, pd.DataFrame(plan["data"], columns=plan["columns"]), sep="\n")
-
-    return plan
+    return service.create_plan(areas)
 
 
 @router.post("/upload/")
