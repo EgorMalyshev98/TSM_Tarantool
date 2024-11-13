@@ -1,52 +1,41 @@
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
-from sort_key import build
-
+from src.tarantool.services.plan.operations import OperationSelector
 
 @pytest.fixture()
 def input_df():
-    data = [
-        ["snt_prs", 33.0, 40.0, 1],
-        ["ust_nasp", 33.0, 90.0, 2],
-        ["ust_kv", 33.0, 50.0, 2],
-        ["ust_geotxtl", 33.0, 45.0, 3],
-        ["ust_pps", 33.0, 45.0, 4],
-        ["snt_prs", 40.0, 45.0, 1],
-        ["snt_prs", 45.0, 59.0, 1],
-        ["ust_geotxtl", 45.0, 59.0, 3],
-        ["ust_pps", 45.0, 59.0, 4],
-        ["ust_kv", 50.0, 59.0, 2],
-        ["snt_prs", 60.0, 70.0, 1],
+    input_data = [
+        [1, 1, 10, 40, 100], 
+        [2, 2, 10, 50, 100], 
+        [3, 3, 10, 15, 100], 
+        [3, 4, 15, 40, 100], 
+        [4, 5, 10, 20, 100], 
+        [4, 6, 20, 40, 100], 
     ]
 
-    cols = ["operation_type", "start_p", "finish_p", "hierarchy"]
-    return pd.DataFrame(data, columns=cols).sort_values(["start_p", "hierarchy"]).reset_index(drop=True)
+    input_cols = ["hierarchy", "id", "start_p", "finish_p", "volume_p"]
+    return pd.DataFrame(input_data, columns=input_cols)
 
 
 @pytest.fixture()
 def expected_df():
     expected_data = [
-        ["snt_prs", 33.0, 40.0, 1, 0],
-        ["ust_nasp", 33.0, 90.0, 2, -1],
-        ["ust_kv", 33.0, 50.0, 2, 3],
-        ["ust_geotxtl", 33.0, 45.0, 3, -1],
-        ["ust_pps", 33.0, 45.0, 4, -1],
-        ["snt_prs", 40.0, 45.0, 1, 1],
-        ["snt_prs", 45.0, 59.0, 1, 2],
-        ["ust_geotxtl", 45.0, 59.0, 3, -1],
-        ["ust_pps", 45.0, 59.0, 4, -1],
-        ["ust_kv", 50.0, 59.0, 2, 4],
-        ["snt_prs", 60.0, 70.0, 1, 5],
+        [1, 1, 1, 10, 40, 100], 
+        [2, 2, 2, 10, 40, 80], 
+        [3, 3, 3, 10, 15, 100], 
+        [4, 3, 4, 15, 40, 100], 
+        [5, 4, 5, 10, 20, 100], 
+        [6, 4, 6, 20, 40, 100], 
+        [7, 2, 2, 40, 50, 20], 
     ]
 
-    expected_cols = ["operation_type", "start_p", "finish_p", "hierarchy", "sort_key"]
+    expected_cols = ["sort_key", "hierarchy", "id", "start_p", "finish_p", "volume_p"]
     return pd.DataFrame(expected_data, columns=expected_cols)
 
 
-def test_sort_key(input_df, expected_df):
-    input_to_func_df = input_df[["start_p", "finish_p", "hierarchy"]]
+def test_sort_by_technology(input_df, expected_df):
 
-    input_df.loc[:, "sort_key"] = build(input_to_func_df)
+    result_input_df = OperationSelector._sort_by_technology(input_df)
 
-    assert_frame_equal(input_df, expected_df, check_dtype=False)
+    assert_frame_equal(result_input_df, expected_df, check_dtype=False)
