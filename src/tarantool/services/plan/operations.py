@@ -50,7 +50,6 @@ class Wall:
         layer = self.merged_blocks_per_layer[lvl - 1]
 
         for prev_block in layer:
-            logger.debug(prev_block)
             prev_start, prev_fin = prev_block
 
             if start >= prev_fin:
@@ -98,7 +97,7 @@ class Wall:
 
             if is_valid:
                 self._add_block(block, lvl)
-                if lvl + 1 < max_lvl:
+                if lvl + 1 <= max_lvl:
                     lvl += 1
                 continue
 
@@ -151,8 +150,9 @@ class BlockSeparator:
                     break
                 if start_p < point <= finish_p:
                     left_vol = (point - start_p) * vol_per_unit
-                    splitted_blocks.append([point, level, id_, start_p, finish_p, left_vol])
+                    splitted_blocks.append([point, level, id_, start_p, point, left_vol])
                     start_p = point
+                    vol -= left_vol
 
         return splitted_blocks
 
@@ -325,12 +325,13 @@ class OperationSelector:
         wall = []
         cols = works.columns
         blocks_by_construct = BlockSeparator.split_by_construct(works)
+        print(*blocks_by_construct, sep="\n")
 
         for contruct_block in blocks_by_construct:
             blocks: Dict[int, list] = (
                 contruct_block.sort_values(["hierarchy", "start_p"], ascending=[True, False])
                 .reset_index(drop=True)
-                .groupby("hierarchy")
+                .groupby("hierarchy")[cols]
                 .apply(lambda x: x.to_numpy().tolist())
                 .to_dict()
             )
