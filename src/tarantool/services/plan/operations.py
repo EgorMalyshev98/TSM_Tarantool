@@ -35,7 +35,6 @@ class Wall:
             return
 
         self.merged_blocks_per_layer[lvl].append([start, finish])
-        logger.debug(self.merged_blocks_per_layer)
         self.spaces.setdefault(lvl, []).append([prev_finish, start])
 
     def _add_block(self, block: list, lvl: int):
@@ -90,7 +89,6 @@ class Wall:
                 continue
 
             block = self.blocks[lvl].pop()
-            logger.debug(block)
             level, id_, start_p, finish_p, volume_p = block
 
             is_valid = self._is_valid(start_p, finish_p, lvl)
@@ -118,9 +116,9 @@ class BlockSeparator:
         """находит точки в которых изменяется конструкция"""
 
         works = (
-            works.sort_values(["hierarchy", "start_p"])
-            .assign(prev_fin=lambda x: x.groupby("hierarchy")["finish_p"].shift(1).fillna(x.start_p))
-            .assign(last_block=lambda x: x.reset_index().groupby("hierarchy")["index"].transform("max"))
+            works.sort_values(["level", "start_p"])
+            .assign(prev_fin=lambda x: x.groupby("level")["finish_p"].shift(1).fillna(x.start_p))
+            .assign(last_block=lambda x: x.reset_index().groupby("level")["index"].transform("max"))
         )
 
         spaces_filter = works["start_p"] > works["prev_fin"]
@@ -161,7 +159,7 @@ class BlockSeparator:
         """Разделяет пикетажные участки рабочей документации при изменении конструктива
         Args:
             works (pd.Series):
-                hierarchy: уровень операции
+                level: уровень операции
                 id_: id строки
                 start_p: начало участка
                 finish_p: окончание участка
@@ -178,9 +176,9 @@ class BlockSeparator:
 
         blocks_df = (
             pd.DataFrame(splitted_blocks, columns=out_cols)
-            .sort_values(["split_point", "hierarchy", "start_p"], ascending=[True, True, False])
+            .sort_values(["split_point", "level", "start_p"], ascending=[True, True, False])
             .reset_index(drop=True)
-            .assign(hierarchy=lambda df: df.groupby("split_point")["hierarchy"].transform("rank", method="dense"))
+            .assign(level=lambda df: df.groupby("split_point")["level"].transform("rank", method="dense"))
         )
 
         return [df.drop(columns="split_point") for _, df in blocks_df.groupby("split_point")]
@@ -191,7 +189,7 @@ class OperationSelector:
         self.prd = data.prd
         self.fact_df = data.fact
         self.contract = data.contract
-        self.hierarchy = data.hierarchy
+        self.technology = data.technology
 
     def _select_pikets(self, start: int, finish: int, pikets: pd.DataFrame) -> pd.DataFrame:
         """Выбор проектных объемов для заданного пикетажного участка.
@@ -203,6 +201,7 @@ class OperationSelector:
                 DataFrame fields:
                     'num_con' (object): №кв.
                     'operation_type' (object): тип операции.
+                    'unit' (object): ед. объема
                     'picket_start' (float): начало участка.
                     'picket_finish' (float): конец участка.
                     'vol_prd' (float): объем работ по проекту.
@@ -225,7 +224,7 @@ class OperationSelector:
         df = df.add_suffix("_p", axis=1)
         pikets = pd.concat([pikets, df], axis=1)
         mask = pikets["volume_p"] > 0
-        pikets = pikets[mask][["num_con", "operation_type", "start_p", "finish_p", "volume_p"]]
+        pikets = pikets[mask][["num_con", "operation_type", "unit", "start_p", "finish_p", "volume_p"]]
 
         return pikets.reset_index(drop=True)
 
@@ -325,13 +324,12 @@ class OperationSelector:
         wall = []
         cols = works.columns
         blocks_by_construct = BlockSeparator.split_by_construct(works)
-        print(*blocks_by_construct, sep="\n")
 
         for contruct_block in blocks_by_construct:
             blocks: Dict[int, list] = (
-                contruct_block.sort_values(["hierarchy", "start_p"], ascending=[True, False])
+                contruct_block.sort_values(["level", "start_p"], ascending=[True, False])
                 .reset_index(drop=True)
-                .groupby("hierarchy")[cols]
+                .groupby("level")[cols]
                 .apply(lambda x: x.to_numpy().tolist())
                 .to_dict()
             )
@@ -349,12 +347,12 @@ class OperationSelector:
         Returns:
             pd.DataFrame: _description_
         """
-        used_cols = ["hierarchy", "id", "start_p", "finish_p", "volume_p"]
+        used_cols = ["level", "id", "start_p", "finish_p", "volume_p"]
 
         dop_cols = ["id", "num_con", "operation_type", "work_name", "unit"]
 
         operations = self._select_pikets(input_start, input_fin, self.prd.copy()).merge(
-            self.hierarchy, how="left", on="operation_type"
+            self.technology, how="left", on="operation_type"
         )
 
         dop_cols_df = operations[dop_cols]
@@ -364,6 +362,5 @@ class OperationSelector:
         operations.loc[:, "volume_f"] = self._add_fact(operations.copy(), self.fact_df.copy())
         operations.loc[:, "vol_remain"] = operations["volume_p"] - operations["volume_f"]
         operations.loc[:, "cost_remain"] = self._add_cost(operations[["num_con", "vol_remain"]], self.contract.copy())
-        print(operations)
 
         return operations

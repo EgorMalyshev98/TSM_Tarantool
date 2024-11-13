@@ -94,10 +94,9 @@ class Query:
         query = """
             SELECT
                 id,
-                "hierarchy",
+                level,
                 operation_type,
-                work_name,
-                unit
+                work_name
             FROM
                 tarantool.dev_app__technology;
         """

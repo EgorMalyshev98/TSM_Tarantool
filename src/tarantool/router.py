@@ -20,19 +20,15 @@ def plan(
     areas = [[area.start, area.finish] for area in oper_plan.areas]
     num_days = oper_plan.num_days
 
-    is_res_limit = oper_plan.is_resource_limit
+    # is_res_limit = oper_plan.is_resource_limit
 
     try:
         data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
         service = TarantoolService(data)  # TODO Dependency injection
-        if is_res_limit:
-            return service.create_plan_with_resource_constrain(areas, num_days)
 
-        return service.create_plan(areas)
+        return service.create_plan(areas, num_days)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/upload/")

@@ -35,7 +35,7 @@ class LoaderService:
             prd=prd,
             fact=fact,
             contract=query.get_contract(),
-            hierarchy=query.get_technology(),
+            technology=query.get_technology(),
             norms=query.get_norm(),
             resources=query.get_available_tech(),
         )
@@ -53,7 +53,7 @@ class TarantoolService:
             "volume_p",
             "volume_f",
             "vol_remain",
-            "hierarchy",
+            "level",
             "cost_remain",
             "sort_key",
         ]
@@ -65,26 +65,19 @@ class TarantoolService:
         opers.loc[:, "sort_key"] = opers.index
         return opers[self.cols]
 
-    def create_plan(self, input_areas: List[List[int]]):
+    # def create_plan(self, input_areas: List[List[int]]):
+    #     opers = self._get_operations_plan(input_areas)
+
+    #     return {"columns": opers.columns.to_list(), "data": opers.to_numpy().tolist()}
+
+    def create_plan(self, input_areas: List[List[int]], num_days: int):
         opers = self._get_operations_plan(input_areas)
-
-        return {"columns": opers.columns.to_list(), "data": opers.to_numpy().tolist()}
-
-    def create_plan_with_resource_constrain(self, input_areas: List[List[int]], num_days: int):
-        opers = self._get_operations_plan(input_areas)
-        req_workload = self.tech_require.require_workload(opers[["operation_type", "vol_remain", "sort_key"]])
-
-        last_oper = self.tech_require.workload_constrain(req_workload, num_days)
-
-        if not last_oper:
-            return {
-                "columns": opers.columns.to_list(),
-                "data": opers.to_numpy().tolist(),
-            }
+        req_workload = self.tech_require.require_workload(opers)
+        opers_with_res = self.tech_require.workload_constrain(req_workload, num_days)
 
         return {
-            "columns": opers.columns.to_list(),
-            "data": opers[opers["sort_key"] < last_oper].to_numpy().tolist(),
+            "columns": opers_with_res.columns.to_list(),
+            "data": opers_with_res.to_numpy().tolist(),
         }
 
 

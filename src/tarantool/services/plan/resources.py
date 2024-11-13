@@ -1,5 +1,3 @@
-from venv import logger
-
 import pandas as pd
 
 from src.tarantool.models import PlanSources
@@ -26,18 +24,14 @@ class TechRequire:
             .drop(columns=["quantity", "shift_work"])
         )
 
-        cum_workload = require_workload.merge(res, how="left", on="technique_type").assign(
+        return require_workload.merge(res, how="left", on="technique_type").assign(
             cum_workload=lambda df: df.groupby("technique_type")["require_workload"].cumsum(),
         )
 
-        constarin_works = cum_workload[cum_workload["workload_limit"] < cum_workload["cum_workload"]]["sort_key"]
+        # constarin_works = cum_workload[cum_workload["workload_limit"] < cum_workload["cum_workload"]]["sort_key"]
 
-        logger.debug(constarin_works)
-
-        if constarin_works.empty:
-            return None
-
-        return constarin_works.min()
+        # if constarin_works.empty:
+        #     return None
 
     def require_workload(self, operations: pd.DataFrame) -> pd.DataFrame:
         """Определение требуемой трудоемкости

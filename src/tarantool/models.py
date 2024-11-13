@@ -13,7 +13,7 @@ class Area(BaseModel):
 class PlanRequest(BaseModel):
     areas: List[Area]
     num_days: int
-    is_resource_limit: bool
+    # is_resource_limit: bool
 
 
 class PlanResponse(BaseModel):
@@ -33,5 +33,5 @@ class PlanSources:
     fact: pd.DataFrame
     contract: pd.DataFrame
     norms: pd.DataFrame
-    hierarchy: pd.DataFrame
+    technology: pd.DataFrame
     resources: pd.DataFrame
