@@ -1,5 +1,4 @@
-import pandas as pd
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import APIKeyHeader
 
 from src.auth.base_config import auth_header, current_verified_user
@@ -23,15 +22,17 @@ def plan(
 
     is_res_limit = oper_plan.is_resource_limit
 
-    data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
-    service = TarantoolService(data)  # TODO Dependency injection
-    if is_res_limit:
-        return service.create_plan_with_resource_constrain(areas, num_days)
+    try:
+        data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
+        service = TarantoolService(data)  # TODO Dependency injection
+        if is_res_limit:
+            return service.create_plan_with_resource_constrain(areas, num_days)
 
-    plan = service.create_plan(areas)
-    print(data.prd, data.fact, pd.DataFrame(plan["data"], columns=plan["columns"]), sep="\n")
-
-    return plan
+        return service.create_plan(areas)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/upload/")
