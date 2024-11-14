@@ -51,10 +51,10 @@ class Wall:
         for prev_block in layer:
             prev_start, prev_fin = prev_block
 
-            if start >= prev_fin:
+            if prev_fin >= finish:
                 return True
-            if start >= prev_start and finish <= prev_fin:
-                return True
+            # if start >= prev_start and finish <= prev_fin:
+            #     return True
 
         return False
 
