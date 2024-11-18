@@ -81,10 +81,21 @@ class TarantoolService:
         }
 
 
-if __name__ == "__main__":
-    query = Query()
+# if __name__ == "__main__":
+#     areas = [[1500, 1600]]
+#     data = LoaderService.get_plan_source_data(areas)
+#     selector = OperationSelector(data)
+#     start, finish = areas[0]
 
-    areas = [[9775.42, 9800]]
-    data = LoaderService.get_plan_source_data(areas)
+#     prd = data.prd.copy().merge(data.technology, how="left", on="operation_type")
 
-    plan = TarantoolService(data).create_plan(areas)
+#     point_objects = prd[prd["is_point_object"] is True].rename(
+#         columns={"picket_start": "start_p", "picket_finish": "finish_p"}
+#     )
+#     base_operations = prd[prd["is_point_object"] is False]
+#     base_operations = selector._select_pikets(start, finish, base_operations)
+#     key_operations = base_operations[base_operations["is_key_oper"] is True].drop(columns="is_key_oper")
+#     non_key_operations = base_operations[base_operations["is_key_oper"] is False].drop(columns="is_key_oper")
+
+#     cols = ["level", "start_p", "finish_p"]
+#     print(point_objects.columns, key_operations.columns, non_key_operations[cols], sep="\n")

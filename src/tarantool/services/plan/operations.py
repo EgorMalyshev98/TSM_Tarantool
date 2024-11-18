@@ -38,7 +38,7 @@ class Wall:
         self.spaces.setdefault(lvl, []).append([prev_finish, start])
 
     def _add_block(self, block: list, lvl: int):
-        level, id_, start_p, finish_p, volume_p = block
+        level, id_, start_p, finish_p, volume_p, is_key_oper, is_point_object = block
         self._merge_block(start_p, finish_p, lvl)
         self.values.append(block)
 
@@ -89,11 +89,18 @@ class Wall:
                 continue
 
             block = self.blocks[lvl].pop()
-            level, id_, start_p, finish_p, volume_p = block
+            logger.debug(block)
+            level, id_, start_p, finish_p, volume_p, is_key_oper, is_point_object = block
+
+            # if is_point_object:
+            #     self.values.append(block)
+            #     if lvl + 1 <= max_lvl:
+            #         lvl += 1
+            #         continue
 
             is_valid = self._is_valid(start_p, finish_p, lvl)
 
-            if is_valid:
+            if is_valid or is_point_object:
                 self._add_block(block, lvl)
                 if lvl + 1 <= max_lvl:
                     lvl += 1
@@ -122,7 +129,8 @@ class BlockSeparator:
         )
 
         spaces_filter = works["start_p"] > works["prev_fin"]
-        error_filter = works["start_p"] < works["prev_fin"]
+        non_key_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"] is False)
+        error_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"] is True)
         last_block_filter = works.index == works["last_block"]
 
         err_df = works[error_filter]
@@ -132,8 +140,9 @@ class BlockSeparator:
 
         spaced_points = works[spaces_filter][["start_p", "prev_fin"]].to_numpy().flatten().tolist()
         last_block_points = works[last_block_filter]["finish_p"].to_numpy().flatten().tolist()
+        non_key_opers = non_key_filter[non_key_filter].to_numpy().flatten().tolist()
 
-        return sorted({*spaced_points, *last_block_points})
+        return sorted({*spaced_points, *last_block_points, *non_key_opers})
 
     @staticmethod  # TODO numba
     def _numba_split_blocks(works: np.ndarray, split_points: list):
@@ -141,14 +150,14 @@ class BlockSeparator:
 
         for inx in range(works.shape[0]):
             row = works[inx]
-            level, id_, start_p, finish_p, vol, vol_per_unit = row
+            level, id_, start_p, finish_p, vol, is_key_oper, is_point_object, vol_per_unit = row
             for point in split_points:
                 if finish_p <= point:
-                    splitted_blocks.append([point, level, id_, start_p, finish_p, vol])
+                    splitted_blocks.append([point, level, id_, start_p, finish_p, vol, is_key_oper, is_point_object])
                     break
                 if start_p < point <= finish_p:
                     left_vol = (point - start_p) * vol_per_unit
-                    splitted_blocks.append([point, level, id_, start_p, point, left_vol])
+                    splitted_blocks.append([point, level, id_, start_p, point, left_vol, is_key_oper, is_point_object])
                     start_p = point
                     vol -= left_vol
 
@@ -171,7 +180,7 @@ class BlockSeparator:
         split_points = cls._find_split_points(works)
         out_cols = ["split_point", *works.columns]
         works = works.assign(vol_per_unit=lambda x: (x.volume_p / (x.finish_p - x.start_p))).to_numpy()
-
+        print(works)
         splitted_blocks = cls._numba_split_blocks(works, split_points)
 
         blocks_df = (
@@ -224,7 +233,7 @@ class OperationSelector:
         df = df.add_suffix("_p", axis=1)
         pikets = pd.concat([pikets, df], axis=1)
         mask = pikets["volume_p"] > 0
-        pikets = pikets[mask][["num_con", "operation_type", "unit", "start_p", "finish_p", "volume_p"]]
+        pikets = pikets[mask]
 
         return pikets.reset_index(drop=True)
 
@@ -325,9 +334,11 @@ class OperationSelector:
         cols = works.columns
         blocks_by_construct = BlockSeparator.split_by_construct(works)
 
-        for contruct_block in blocks_by_construct:
+        for construct_block in blocks_by_construct:
             blocks: Dict[int, list] = (
-                contruct_block.sort_values(["level", "start_p"], ascending=[True, False])
+                construct_block.sort_values(
+                    ["level", "start_p", "is_point_object", "is_key_oper"], ascending=[True, False, True, True]
+                )
                 .reset_index(drop=True)
                 .groupby("level")[cols]
                 .apply(lambda x: x.to_numpy().tolist())

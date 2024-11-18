@@ -93,10 +93,10 @@ class Query:
     def get_technology(self):
         query = """
             SELECT
-                id,
                 level,
                 operation_type,
-                work_name
+                is_key_oper,
+                is_point_object
             FROM
                 tarantool.dev_app__technology;
         """
