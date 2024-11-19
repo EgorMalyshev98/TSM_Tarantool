@@ -89,7 +89,6 @@ class Wall:
                 continue
 
             block = self.blocks[lvl].pop()
-            logger.debug(block)
             level, id_, start_p, finish_p, volume_p, is_key_oper, is_point_object = block
 
             # if is_point_object:
@@ -180,7 +179,6 @@ class BlockSeparator:
         split_points = cls._find_split_points(works)
         out_cols = ["split_point", *works.columns]
         works = works.assign(vol_per_unit=lambda x: (x.volume_p / (x.finish_p - x.start_p))).to_numpy()
-        print(works)
         splitted_blocks = cls._numba_split_blocks(works, split_points)
 
         blocks_df = (
@@ -193,12 +191,72 @@ class BlockSeparator:
         return [df.drop(columns="split_point") for _, df in blocks_df.groupby("split_point")]
 
 
+class WallBuilder:
+    @staticmethod
+    def _df_blocks_to_dict(construct_block: pd.DataFrame) -> Dict[int, list]:
+        cols = construct_block.columns
+        return (
+            construct_block.sort_values(
+                ["level", "start_p", "is_point_object", "is_key_oper"], ascending=[True, False, True, True]
+            )
+            .reset_index(drop=True)
+            .groupby("level")[cols]
+            .apply(lambda x: x.to_numpy().tolist())
+            .to_dict()
+        )
+
+    def _insert_point_objects(self: pd.DataFrame, point_objects: pd.DataFrame):
+        concated = []
+
+        for start, obj in point_objects.groupby("start_p"):
+            inx = self[self["start_p"] == start].index.min()
+            logger.debug(inx)
+
+            top = self.iloc[inx:]
+            bottom = self.iloc[:inx]
+
+            concated.extend([bottom, obj, top])
+
+        return pd.concat(concated).drop(columns="sort_key").reset_index(names="sort_key")
+
+    @classmethod
+    def set_works_sequence(cls, works: pd.DataFrame) -> pd.DataFrame:
+        """Определение последовательности работ на пикетажных участках
+        Args:
+            works (pd.DataFrame):
+
+        Returns:
+            pd.Series: ключ сортировки
+        """
+
+        wall = []
+        cols = works.columns
+        blocks_by_construct = BlockSeparator.split_by_construct(works)
+        point_object_blocks = []
+
+        for construct_block in blocks_by_construct:
+            point_obj_filter = construct_block["is_point_object"]
+            point_obj = construct_block[point_obj_filter]
+
+            if not point_obj.empty:
+                point_object_blocks.append(point_obj.sort_values(["start_p", "level"]))
+
+            blocks = cls._df_blocks_to_dict(construct_block[~point_obj_filter])
+            wall.extend(Wall(blocks).build())
+
+        wall = pd.DataFrame(wall, columns=cols).reset_index(names="sort_key")
+        point_objects = pd.concat(point_object_blocks)
+
+        return cls._insert_point_objects(wall, point_objects)
+
+
 class OperationSelector:
-    def __init__(self, data: PlanSources):
+    def __init__(self, data: PlanSources, builder: WallBuilder = WallBuilder):
         self.prd = data.prd
         self.fact_df = data.fact
         self.contract = data.contract
         self.technology = data.technology
+        self.builder = builder
 
     def _select_pikets(self, start: int, finish: int, pikets: pd.DataFrame) -> pd.DataFrame:
         """Выбор проектных объемов для заданного пикетажного участка.
@@ -320,34 +378,6 @@ class OperationSelector:
         merged = project.merge(contract, how="left", on="num_con", validate="many_to_one")
         return merged["price"] * merged["vol_remain"]
 
-    @staticmethod
-    def _sort_by_technology(works: pd.DataFrame) -> pd.DataFrame:
-        """Определение последовательности работ на пикетажных участках
-        Args:
-            works (pd.DataFrame):
-
-        Returns:
-            pd.Series: ключ сортировки
-        """
-
-        wall = []
-        cols = works.columns
-        blocks_by_construct = BlockSeparator.split_by_construct(works)
-
-        for construct_block in blocks_by_construct:
-            blocks: Dict[int, list] = (
-                construct_block.sort_values(
-                    ["level", "start_p", "is_point_object", "is_key_oper"], ascending=[True, False, True, True]
-                )
-                .reset_index(drop=True)
-                .groupby("level")[cols]
-                .apply(lambda x: x.to_numpy().tolist())
-                .to_dict()
-            )
-            wall.extend(Wall(blocks).build())
-
-        return pd.DataFrame(wall, columns=cols).reset_index(names="sort_key")
-
     def select(self, input_start: float, input_fin: float) -> pd.DataFrame:
         """Выбор планируемых работ на пикетажных участках
 
@@ -368,7 +398,7 @@ class OperationSelector:
 
         dop_cols_df = operations[dop_cols]
 
-        operations = self._sort_by_technology(operations[used_cols]).merge(dop_cols_df, how="left", on="id")
+        operations = self.builder.set_works_sequence(operations[used_cols]).merge(dop_cols_df, how="left", on="id")
 
         operations.loc[:, "volume_f"] = self._add_fact(operations.copy(), self.fact_df.copy())
         operations.loc[:, "vol_remain"] = operations["volume_p"] - operations["volume_f"]

@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
-from src.tarantool.services.plan.operations import OperationSelector
+from src.tarantool.services.plan.operations import WallBuilder
 
 
 # Вариант 1
@@ -38,7 +38,7 @@ def expected_df_1():
 
 
 def test_sort_by_technology_1(input_df_1, expected_df_1):
-    result_input_df = OperationSelector._sort_by_technology(input_df_1)  # noqa: SLF001
+    result_input_df = WallBuilder.set_works_sequence(input_df_1)
     result_input_df.volume_p = result_input_df.volume_p.round(1)
 
     assert_frame_equal(result_input_df, expected_df_1, check_dtype=False)
@@ -76,7 +76,7 @@ def expected_df_2():
 
 
 def test_sort_by_technology_2(input_df_2, expected_df_2):
-    result_input_df = OperationSelector._sort_by_technology(input_df_2)  # noqa: SLF001
+    result_input_df = WallBuilder.set_works_sequence(input_df_2)
     result_input_df.volume_p = result_input_df.volume_p.round(1)
 
     assert_frame_equal(result_input_df, expected_df_2, check_dtype=False)
@@ -115,7 +115,7 @@ def expected_df_3():
 
 
 def test_sort_by_technology_3(input_df_3, expected_df_3):
-    result_input_df = OperationSelector._sort_by_technology(input_df_3)  # noqa: SLF001
+    result_input_df = WallBuilder.set_works_sequence(input_df_3)
     result_input_df.volume_p = result_input_df.volume_p.round(1)
 
     assert_frame_equal(result_input_df, expected_df_3, check_dtype=False)
@@ -153,7 +153,7 @@ def expected_df_4():
 
 
 def test_sort_by_technology_4(input_df_4, expected_df_4):
-    result_input_df = OperationSelector._sort_by_technology(input_df_4)  # noqa: SLF001
+    result_input_df = WallBuilder.set_works_sequence(input_df_4)
     result_input_df.volume_p = result_input_df.volume_p.round(1)
 
     assert_frame_equal(result_input_df, expected_df_4, check_dtype=False)
@@ -193,7 +193,7 @@ def expected_df_5():
 
 
 def test_sort_by_technology_5(input_df_5, expected_df_5):
-    result_input_df = OperationSelector._sort_by_technology(input_df_5)  # noqa: SLF001
+    result_input_df = WallBuilder.set_works_sequence(input_df_5)
     result_input_df.volume_p = result_input_df.volume_p.round(1)
 
     assert_frame_equal(result_input_df, expected_df_5, check_dtype=False)
@@ -242,7 +242,24 @@ def expected_df_6():
 
 
 def test_sort_by_technology_6(input_df_6, expected_df_6):
-    result_input_df = OperationSelector._sort_by_technology(input_df_6)  # noqa: SLF001
+    result_input_df = WallBuilder.set_works_sequence(input_df_6)
     result_input_df.volume_p = result_input_df.volume_p.round(1)
 
     assert_frame_equal(result_input_df, expected_df_6, check_dtype=False)
+
+
+if __name__ == "__main__":
+    data = [
+        [1, 1, 10, 40, 100, True, False],
+        [2, 2, 10, 50, 100, True, False],
+        [3, 3, 45, 45, 100, True, True],
+        [4, 4, 45, 45, 100, True, True],
+        [5, 5, 25, 47, 100, False, False],
+        [5, 6, 10, 15, 100, True, False],
+        [5, 7, 15, 50, 100, True, False],
+        [6, 8, 10, 20, 100, True, False],
+        [6, 9, 20, 40, 100, True, False],
+    ]
+    input_cols = ["level", "id", "start_p", "finish_p", "volume_p", "is_key_oper", "is_point_object"]
+    df = pd.DataFrame(data, columns=input_cols)
+    print(WallBuilder.set_works_sequence(df))
