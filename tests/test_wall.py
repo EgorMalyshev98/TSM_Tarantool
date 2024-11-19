@@ -1,3 +1,5 @@
+from pprint import pprint
+
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
@@ -250,16 +252,17 @@ def test_sort_by_technology_6(input_df_6, expected_df_6):
 
 if __name__ == "__main__":
     data = [
-        [1, 1, 10, 40, 100, True, False],
-        [2, 2, 10, 50, 100, True, False],
-        [3, 3, 45, 45, 100, True, True],
-        [4, 4, 45, 45, 100, True, True],
-        [5, 5, 25, 47, 100, False, False],
-        [5, 6, 10, 15, 100, True, False],
-        [5, 7, 15, 50, 100, True, False],
-        [6, 8, 10, 20, 100, True, False],
-        [6, 9, 20, 40, 100, True, False],
+        [1, 1, 0, 25, 100, True, False],
+        [1, 2, 25, 50, 100, True, False],
+        [2, 3, 0, 40, 100, True, False],
+        [2, 4, 40, 50, 100, True, False],
+        [3, 5, 0, 10, 100, False, False],
+        [3, 6, 10, 30, 100, False, False],
+        [3, 7, 30, 50, 100, False, False],
+        [3, 8, 0, 15, 100, True, False],
+        [3, 9, 15, 27, 100, True, False],
+        [3, 10, 27, 50, 100, True, False],
     ]
     input_cols = ["level", "id", "start_p", "finish_p", "volume_p", "is_key_oper", "is_point_object"]
     df = pd.DataFrame(data, columns=input_cols)
-    print(WallBuilder.set_works_sequence(df))
+    pprint(WallBuilder.set_works_sequence(df).to_numpy().tolist())

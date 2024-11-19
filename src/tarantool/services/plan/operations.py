@@ -1,3 +1,4 @@
+from pprint import pprint
 from typing import Dict, List
 
 import numpy as np
@@ -91,15 +92,15 @@ class Wall:
             block = self.blocks[lvl].pop()
             level, id_, start_p, finish_p, volume_p, is_key_oper, is_point_object = block
 
-            # if is_point_object:
-            #     self.values.append(block)
-            #     if lvl + 1 <= max_lvl:
-            #         lvl += 1
-            #         continue
+            if not is_key_oper:
+                self.values.append(block)
+                if lvl + 1 <= max_lvl:
+                    lvl += 1
+                continue
 
             is_valid = self._is_valid(start_p, finish_p, lvl)
 
-            if is_valid or is_point_object:
+            if is_valid:
                 self._add_block(block, lvl)
                 if lvl + 1 <= max_lvl:
                     lvl += 1
@@ -128,7 +129,7 @@ class BlockSeparator:
         )
 
         spaces_filter = works["start_p"] > works["prev_fin"]
-        non_key_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"] is False)
+        # non_key_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"] is False)
         error_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"] is True)
         last_block_filter = works.index == works["last_block"]
 
@@ -139,9 +140,9 @@ class BlockSeparator:
 
         spaced_points = works[spaces_filter][["start_p", "prev_fin"]].to_numpy().flatten().tolist()
         last_block_points = works[last_block_filter]["finish_p"].to_numpy().flatten().tolist()
-        non_key_opers = non_key_filter[non_key_filter].to_numpy().flatten().tolist()
+        # non_key_opers = non_key_filter[non_key_filter].to_numpy().flatten().tolist()
 
-        return sorted({*spaced_points, *last_block_points, *non_key_opers})
+        return sorted({*spaced_points, *last_block_points})
 
     @staticmethod  # TODO numba
     def _numba_split_blocks(works: np.ndarray, split_points: list):
@@ -196,24 +197,21 @@ class WallBuilder:
     def _df_blocks_to_dict(construct_block: pd.DataFrame) -> Dict[int, list]:
         cols = construct_block.columns
         return (
-            construct_block.sort_values(
-                ["level", "start_p", "is_point_object", "is_key_oper"], ascending=[True, False, True, True]
-            )
+            construct_block.sort_values(["level", "start_p", "is_key_oper"], ascending=[True, False, True])
             .reset_index(drop=True)
             .groupby("level")[cols]
             .apply(lambda x: x.to_numpy().tolist())
             .to_dict()
         )
 
-    def _insert_point_objects(self: pd.DataFrame, point_objects: pd.DataFrame):
+    @staticmethod
+    def _insert_point_objects(wall: pd.DataFrame, point_objects: pd.DataFrame):
         concated = []
 
         for start, obj in point_objects.groupby("start_p"):
-            inx = self[self["start_p"] == start].index.min()
-            logger.debug(inx)
-
-            top = self.iloc[inx:]
-            bottom = self.iloc[:inx]
+            inx = wall[wall["start_p"] == start].index.min()
+            top = wall.iloc[inx:]
+            bottom = wall.iloc[:inx]
 
             concated.extend([bottom, obj, top])
 
@@ -242,9 +240,14 @@ class WallBuilder:
                 point_object_blocks.append(point_obj.sort_values(["start_p", "level"]))
 
             blocks = cls._df_blocks_to_dict(construct_block[~point_obj_filter])
+            pprint(blocks)
             wall.extend(Wall(blocks).build())
 
         wall = pd.DataFrame(wall, columns=cols).reset_index(names="sort_key")
+
+        if not point_object_blocks:
+            return wall
+
         point_objects = pd.concat(point_object_blocks)
 
         return cls._insert_point_objects(wall, point_objects)
