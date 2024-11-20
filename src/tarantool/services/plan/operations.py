@@ -391,7 +391,7 @@ class OperationSelector:
         Returns:
             pd.DataFrame: _description_
         """
-        used_cols = ["level", "id", "start_p", "finish_p", "volume_p"]
+        used_cols = ["level", "id", "start_p", "finish_p", "volume_p", "is_key_oper", "is_point_object"]
 
         dop_cols = ["id", "num_con", "operation_type", "work_name", "unit"]
 
