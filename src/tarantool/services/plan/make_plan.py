@@ -56,6 +56,12 @@ class TarantoolService:
             "level",
             "cost_remain",
             "sort_key",
+            "unit",
+            "construct_type",
+            "construct_name",
+            "work_name",
+            "is_key_oper",
+            "is_point_object",
         ]
 
     def _get_operations_plan(self, input_areas: List[List[int]]):

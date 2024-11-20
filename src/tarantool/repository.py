@@ -95,6 +95,8 @@ class Query:
             SELECT
                 level,
                 operation_type,
+                construct_type,
+                construct_name,
                 is_key_oper,
                 is_point_object
             FROM

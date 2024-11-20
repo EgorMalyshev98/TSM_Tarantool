@@ -393,11 +393,21 @@ class OperationSelector:
         """
         used_cols = ["level", "id", "start_p", "finish_p", "volume_p", "is_key_oper", "is_point_object"]
 
-        dop_cols = ["id", "num_con", "operation_type", "work_name", "unit"]
+        dop_cols = [
+            "id",
+            "num_con",
+            "operation_type",
+            "work_name",
+            "unit",
+            "construct_type",
+            "construct_name",
+        ]
 
         operations = self._select_pikets(input_start, input_fin, self.prd.copy()).merge(
             self.technology, how="left", on="operation_type"
         )
+
+        logger.debug(operations.columns.to_list())
 
         dop_cols_df = operations[dop_cols]
 
