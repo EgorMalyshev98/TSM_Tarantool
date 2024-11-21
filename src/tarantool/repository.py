@@ -3,29 +3,44 @@ from typing import Any, Optional
 
 import pandas as pd
 from fastapi import HTTPException
+from psycopg import Connection, Cursor, sql
 from psycopg2.errors import UndefinedColumn
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from src.database import engine, get_session
 from src.log import logger
 from src.tarantool.models import UploadTable
 
+OID_TYPES_MAP = {23: "int64", 1043: "string", 701: "float64", 16: "bool", 1082: "datetime64[ns]"}
+
 
 class Statement:
-    def upsert_copy_from(self, table: UploadTable):
+    @staticmethod
+    def truncate(table_name: str, cursor: Cursor):
+        try:
+            stmt = sql.SQL("TRUNCATE TABLE {table};").format(table=sql.Identifier(table_name))
+
+            logger.debug(stmt.as_string(cursor))
+            cursor.execute(stmt)
+
+        except Exception as e:
+            logger.error(e)
+            raise
+
+    @staticmethod
+    def batch_insert(table: UploadTable, cursor: Cursor):
         csv_buffer = io.StringIO()
-        raw_conn = engine.raw_connection()
-        cur = raw_conn.cursor()
         try:
             for row in table.rows:
                 s_row = "\t".join(map(str, row)) + "\n"
                 csv_buffer.write(s_row)
 
             csv_buffer.seek(0)
-            cur.execute(f"TRUNCATE {table.name}")
-            cur.copy_from(csv_buffer, table.name, columns=table.columns, sep="\t", null="")
-            raw_conn.commit()
+
+            stmt = sql.SQL("COPY {table}({columns}) FROM stdin (format csv, delimiter '\t', NULL '')").format(
+                table=sql.Identifier(table.name), columns=sql.SQL(", ").join(map(sql.Identifier, table.columns))
+            )
+
+            with cursor.copy(stmt) as copy:
+                copy.write(csv_buffer.read())
 
         except UndefinedColumn as e:
             logger.log(e)
@@ -33,16 +48,11 @@ class Statement:
 
         except Exception as e:
             logger.error(e)
-            raw_conn.rollback()
             raise
-
-        finally:
-            cur.close()
-            raw_conn.close()
 
 
 class Query:
-    def __init__(self, db: Session = next(get_session())):  # TODO Dependency injection
+    def __init__(self, db: Connection):  # TODO Dependency injection
         self.db = db
 
     def get_prd(self, start: int, finish: int):
@@ -63,13 +73,13 @@ class Query:
                 picket_finish >= (
                     SELECT min(picket_finish)
                     FROM tarantool.dev_app__prd dap
-                    WHERE picket_finish >= :start
+                    WHERE picket_finish >= %(start)s
                 )
                 AND
                 picket_start <= (
                     SELECT max(picket_start)
                     FROM tarantool.dev_app__prd dap
-                    WHERE picket_start <= :finish
+                    WHERE picket_start <= %(finish)s
                 )
         """
         params = {"start": start, "finish": finish}
@@ -154,13 +164,13 @@ class Query:
                 picket_finish >= (
                     SELECT min(picket_finish)
                     FROM tarantool.dev_app__prd dap
-                    WHERE picket_finish >= :start
+                    WHERE picket_finish >= %(start)s
                 )
                 AND
                 picket_start <= (
                     SELECT max(picket_start)
                     FROM tarantool.dev_app__prd dap
-                    WHERE picket_start <= :finish
+                    WHERE picket_start <= %(finish)s
                 )
         """
         params = {"start": start, "finish": finish}
@@ -168,11 +178,10 @@ class Query:
         return self._get_data(query, params)
 
     def _get_data(self, query: str, query_params: Optional[dict[str, Any]] = None) -> pd.DataFrame:
-        query = text(query)
-        result = self.db.execute(query, query_params)
-        data = result.all()
-        cols = result.keys()
-
-        self.db.rollback()
-
-        return pd.DataFrame(data, columns=cols)
+        with self.db.cursor() as cur:
+            result = cur.execute(query, query_params)
+            data = result.fetchall()
+            cols = [col_desc[0] for col_desc in result.description]
+            col_types = [OID_TYPES_MAP[col_desc.type_code] for col_desc in result.description]
+            d_types = dict(zip(cols, col_types))
+            return pd.DataFrame(data, columns=cols).astype(d_types)

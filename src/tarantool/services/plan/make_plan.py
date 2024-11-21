@@ -2,6 +2,7 @@ from typing import List
 
 import pandas as pd
 
+from src.database import pool
 from src.tarantool.models import PlanSources
 from src.tarantool.repository import Query
 from src.tarantool.services.plan.operations import OperationSelector
@@ -18,18 +19,19 @@ class LoaderService:
         Returns:
             PlanSources
         """
-        query = Query()
-        prd = (
-            pd.concat([query.get_prd(start, finish) for start, finish in input_areas])
-            .drop_duplicates("id")
-            .reset_index(drop=True)
-        )
+        with pool.connection() as conn:
+            query = Query(conn)
+            prd = (
+                pd.concat([query.get_prd(start, finish) for start, finish in input_areas])
+                .drop_duplicates("id")
+                .reset_index(drop=True)
+            )
 
-        fact = (
-            pd.concat([query.get_fact(start, finish) for start, finish in input_areas])
-            .drop_duplicates("id")
-            .reset_index(drop=True)
-        )
+            fact = (
+                pd.concat([query.get_fact(start, finish) for start, finish in input_areas])
+                .drop_duplicates("id")
+                .reset_index(drop=True)
+            )
 
         return PlanSources(
             prd=prd,
