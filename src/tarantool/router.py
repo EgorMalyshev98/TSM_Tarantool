@@ -41,21 +41,21 @@ def load_data(
     user: User = Depends(current_verified_user),
     auth_header=Depends(auth_header),
 ):
-    session = session_manager.sessions.pop(session_id, None)
-    cursor = session.connection.cursor()
-    UploadService.upload_table(table, cursor)
+    session = session_manager.sessions.get(session_id, None)
+    with session.connection.cursor() as cursor:
+        UploadService.upload_table(table, cursor)
 
     return {"status": "ok"}
 
 
-@upload_router.post("/clear-table/", response_class=PlainTextResponse)
+@upload_router.post("/clear-table/")
 def clear_table(session_id: Annotated[str, Body()], table_name: Annotated[str, Body()]):
     session = session_manager.sessions.get(session_id, None)
     if not session:
         return HTTPException(404, "session not found")
 
-    cursor = session.connection.cursor()
-    UploadService.clear_table(table_name, cursor)
+    with session.connection.cursor() as cursor:
+        UploadService.clear_table(table_name, cursor)
     return f"table {table_name} truncated"
 
 
