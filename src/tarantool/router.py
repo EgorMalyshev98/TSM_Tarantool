@@ -25,13 +25,10 @@ def plan(
     areas = [[area.start, area.finish] for area in oper_plan.areas]
     num_days = oper_plan.num_days
 
-    try:
-        data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
-        service = TarantoolService(data)  # TODO Dependency injection
+    data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
+    service = TarantoolService(data)  # TODO Dependency injection
 
-        return service.create_plan(areas, num_days)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    return service.create_plan(areas, num_days)
 
 
 @upload_router.post("/table/")

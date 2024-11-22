@@ -1,5 +1,6 @@
 import pandas as pd
 
+from src.log import logger
 from src.tarantool.models import PlanSources
 
 
@@ -44,7 +45,7 @@ class TechRequire:
         Returns:
             pd.DataFrame: _description_
         """
-        return (
+        df = (
             operations.merge(
                 self.norms[["operation_type", "technique_type", "workload_1000_units", "num_of_tech"]],
                 how="left",
@@ -53,3 +54,6 @@ class TechRequire:
             .assign(require_workload=lambda df: df["vol_remain"] * df["workload_1000_units"] * df["num_of_tech"] / 1000)
             .drop(columns=["workload_1000_units", "num_of_tech"])
         )
+
+        logger.debug(operations.info())
+        return df

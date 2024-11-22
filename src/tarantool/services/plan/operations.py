@@ -175,7 +175,6 @@ class BlockSeparator:
         Returns:
             List[pd.Dataframe]
         """
-        logger.debug(works.columns)
         split_points = cls._find_split_points(works)
         out_cols = ["split_point", *works.columns]
         works = works.assign(vol_per_unit=lambda x: (x.volume_p / (x.finish_p - x.start_p))).to_numpy()
@@ -209,10 +208,11 @@ class WallBuilder:
             return wall
 
         cols = wall.columns
+        types = wall.dtypes.to_dict()
         key_oper_array = wall.to_numpy()
         non_key_oper_array = non_key_works.to_numpy()
         key_levels = wall["level"].drop_duplicates().to_list()  # список уровней ключевых ресурсов
-        result = np.empty((0, 8))  # пустой массив numpy для заполнения
+        result = np.empty((0, 7))  # пустой массив numpy для заполнения
         if wall.shape[0] == 0:
             for row_non_key_work in non_key_oper_array:
                 result = np.append(result, [row_non_key_work], axis=0)
@@ -234,8 +234,7 @@ class WallBuilder:
                     if level_n < min(key_levels):
                         result = np.append(result, [row_non_key_work], axis=0)
                         non_key_oper_array = np.delete(non_key_oper_array, 0, 0)
-
-        return pd.DataFrame(result, columns=cols).drop(columns="sort_key").reset_index(names="sort_key")
+        return pd.DataFrame(result, columns=cols).astype(types)
 
     @staticmethod
     def _insert_point_objects(wall: pd.DataFrame, point_objects: pd.DataFrame):
@@ -265,7 +264,6 @@ class WallBuilder:
 
         cols = works.columns
         wall = pd.DataFrame(columns=cols)
-
         local_constructs = BlockSeparator.split_by_construct(works)
 
         for local_construct in local_constructs:
@@ -282,10 +280,9 @@ class WallBuilder:
                 .pipe(cls._insert_non_key_works, non_key_works.sort_values(["level", "start_p"]))
                 .pipe(cls._insert_point_objects, point_obj.sort_values(["start_p", "level"]))
             )
+            wall = pd.concat([wall, local_wall], ignore_index=True)
 
-            wall = pd.concat(wall, local_wall, ignore_index=True)
-
-        return wall
+        return wall.reset_index(names="sort_key")
 
 
 class OperationSelector:
@@ -441,8 +438,6 @@ class OperationSelector:
         operations = self._select_pikets(input_start, input_fin, self.prd.copy()).merge(
             self.technology, how="left", on="operation_type"
         )
-
-        logger.debug(operations.columns.to_list())
 
         dop_cols_df = operations[dop_cols]
 
