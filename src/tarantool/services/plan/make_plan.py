@@ -33,14 +33,14 @@ class LoaderService:
                 .reset_index(drop=True)
             )
 
-        return PlanSources(
-            prd=prd,
-            fact=fact,
-            contract=query.get_contract(),
-            technology=query.get_technology(),
-            norms=query.get_norm(),
-            resources=query.get_available_tech(),
-        )
+            return PlanSources(
+                prd=prd,
+                fact=fact,
+                contract=query.get_contract(),
+                technology=query.get_technology(),
+                norms=query.get_norm(),
+                resources=query.get_available_tech(),
+            )
 
 
 class TarantoolService:
