@@ -1,14 +1,87 @@
-from typing import AsyncGenerator, Generator
+import threading
+import time
+from datetime import datetime
+from threading import Lock
+from typing import AsyncGenerator, Dict, Generator
+from uuid import UUID, uuid4
 
-from sqlalchemy import MetaData, create_engine
+from psycopg import Connection
+from psycopg_pool import ConnectionPool
+from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Session, declarative_base, registry, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, declarative_base, registry, sessionmaker
 
 from src.config import db_config
+from src.log import logger
 
 DATABASE_URL = db_config.get_db_url()
 ASYNC_DATABASE_URL = db_config.get_async_db_url()
+SESSION_TIMEOUT = 30
 
+
+pool = ConnectionPool(DATABASE_URL, min_size=5, max_size=50)
+
+
+def get_session() -> Generator[Connection, None, None]:
+    with pool.connection() as session:
+        yield session
+
+
+session_lock = Lock()
+
+
+class Session:
+    def __init__(self, tid: UUID, connection: Connection, created_at: datetime):
+        self.tid = tid
+        self.connection = connection
+        self.created_at = created_at
+
+
+class SessionManger:
+    def __init__(self):
+        self.sessions: Dict[str, Session] = {}
+
+    def create(self):
+        connection = pool.getconn()
+        tid = str(uuid4())
+        now = time.time()
+
+        with session_lock:
+            t = Session(tid=tid, connection=connection, created_at=now)
+            self.sessions[t.tid] = t
+
+        logger.debug(f"connection {tid} created")
+        return tid
+
+    def complete(self, tid: str):
+        with session_lock:
+            session = self.sessions.pop(tid, None)
+            if session:
+                session.connection.commit()
+                pool.putconn(session.connection)
+            logger.debug(f"connection {tid} completed")
+
+    def session_cleanup(self):
+        while True:
+            time.sleep(10)
+            with session_lock:
+                now = time.time()
+                expired_sessions = [tid for tid, t in self.sessions.items() if now - t.created_at > SESSION_TIMEOUT]
+                for tid in expired_sessions:
+                    session = self.sessions.pop(tid, None)
+                    if session:
+                        session.connection.rollback()
+                        pool.putconn(session.connection)
+                        logger.debug(f"Session {tid} rolled back due to timeout")
+
+
+session_manager = SessionManger()
+
+t = threading.Thread(target=session_manager.session_cleanup, daemon=True)
+t.start()
+
+
+#########################################################
 
 Base = declarative_base()
 
@@ -28,24 +101,7 @@ class BaseModel(DeclarativeBase):
     metadata = mapper_registry.metadata
 
 
-engine = create_engine(DATABASE_URL, pool_size=20, max_overflow=10, pool_timeout=30, pool_pre_ping=True)
-engine.echo = False
-
-
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-    expire_on_commit=False,
-)
-
-
-def get_session() -> Generator[Session, None, None]:
-    with SessionLocal() as session:
-        yield session
-
-
-async_engine = create_async_engine(ASYNC_DATABASE_URL, pool_size=20, max_overflow=10, pool_timeout=30, pool_recycle=180)
+async_engine = create_async_engine(ASYNC_DATABASE_URL, pool_size=5, max_overflow=10, pool_timeout=30, pool_recycle=180)
 async_engine.echo = False
 async_session_maker = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
