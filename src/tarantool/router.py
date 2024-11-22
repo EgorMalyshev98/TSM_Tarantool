@@ -6,9 +6,8 @@ from fastapi.security import APIKeyHeader
 
 from src.auth.base_config import auth_header, current_verified_user
 from src.auth.models import User
-from src.database import pool, session_manager
+from src.database import session_manager
 from src.tarantool.models import PlanRequest, UploadTable
-from src.tarantool.repository import Query
 from src.tarantool.services.plan.make_plan import LoaderService, TarantoolService
 from src.tarantool.services.upload import UploadService
 
@@ -33,12 +32,6 @@ def plan(
         return service.create_plan(areas, num_days)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-
-
-@router.get("/tech/")
-def dev_get_technology():
-    with pool.connection() as conn:
-        return Query(conn).get_technology().to_dict()
 
 
 @upload_router.post("/table/")

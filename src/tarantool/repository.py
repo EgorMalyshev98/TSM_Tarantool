@@ -16,8 +16,8 @@ class Statement:
     @staticmethod
     def truncate(table_name: str, cursor: Cursor):
         try:
+            logger.debug(cursor.execute("SELECT 1"))
             stmt = sql.SQL("TRUNCATE TABLE {table};").format(table=sql.Identifier(table_name))
-
             logger.debug(stmt.as_string(cursor))
             cursor.execute(stmt)
 
