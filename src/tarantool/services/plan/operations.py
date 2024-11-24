@@ -129,13 +129,8 @@ class BlockSeparator:
 
         spaces_filter = works["start_p"] > works["prev_fin"]
         # non_key_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"] is False)
-        error_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"])
+        (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"])
         last_block_filter = works.index == works["last_block"]
-
-        err_df = works[error_filter]
-
-        if not err_df.empty:
-            raise ValueError(f'элементы одного уровня пересакаются на пикетах {err_df[["start_p", "prev_fin"]]}')
 
         spaced_points = works[spaces_filter][["start_p", "prev_fin"]].to_numpy().flatten().tolist()
         last_block_points = works[last_block_filter]["finish_p"].to_numpy().flatten().tolist()
@@ -176,6 +171,7 @@ class BlockSeparator:
             List[pd.Dataframe]
         """
         split_points = cls._find_split_points(works)
+        logger.debug(split_points)
         out_cols = ["split_point", *works.columns]
         works = works.assign(vol_per_unit=lambda x: (x.volume_p / (x.finish_p - x.start_p))).to_numpy()
         splitted_blocks = cls._numba_split_blocks(works, split_points)
@@ -206,34 +202,45 @@ class WallBuilder:
     def _insert_non_key_works(wall: pd.DataFrame, non_key_works: pd.DataFrame):
         if non_key_works.empty:
             return wall
-
         cols = wall.columns
+        # ['level', 'id', 'start_p', 'finish_p', 'volume_p', 'is_key_oper', 'is_point_object']
         types = wall.dtypes.to_dict()
-        key_oper_array = wall.to_numpy()
-        non_key_oper_array = non_key_works.to_numpy()
-        key_levels = wall["level"].drop_duplicates().to_list()  # список уровней ключевых ресурсов
-        result = np.empty((0, 7))  # пустой массив numpy для заполнения
-        if wall.shape[0] == 0:
-            for row_non_key_work in non_key_oper_array:
-                result = np.append(result, [row_non_key_work], axis=0)
-        else:
-            for row_key_work in key_oper_array:
-                level, finish_p = row_key_work[1], row_key_work[4]
-                result = np.append(result, [row_key_work], axis=0)
-                for row_non_key_work in non_key_oper_array:
-                    level_n, finish_p_n = row_non_key_work[1], row_non_key_work[4]
-                    # уровень неключевой операции есть в списке ключевых
-                    if level == level_n and finish_p >= finish_p_n:
-                        result = np.append(result, [row_non_key_work], axis=0)
-                        non_key_oper_array = np.delete(non_key_oper_array, 0, 0)
-                    # уровня неключевой операции нет в списке ключевых
-                    if level == (level_n - 1) and finish_p >= finish_p_n and level_n not in key_levels:
-                        result = np.append(result, [row_non_key_work], axis=0)
-                        non_key_oper_array = np.delete(non_key_oper_array, 0, 0)
-                    # ключевая операция первая в датафрейме
-                    if level_n < min(key_levels):
-                        result = np.append(result, [row_non_key_work], axis=0)
-                        non_key_oper_array = np.delete(non_key_oper_array, 0, 0)
+        key_w = wall.to_numpy().tolist()
+        n_key_w = non_key_works.sort_values(["level", "start_p"]).to_numpy().tolist()
+
+        result = []
+
+        k_inx, n_inx = 0, 0
+
+        while k_inx < len(key_w) and n_inx < len(n_key_w):
+            k_row = key_w[k_inx]
+            n_row = n_key_w[n_inx]
+
+            lvl_n, _, start_n, fin_n, _, _, _ = n_row
+
+            if not k_inx:
+                result.append(k_row)
+                k_inx += 1
+                continue
+
+            prev_lvl_k, _, prev_start_k, prev_fin_k, _, _, _ = key_w[k_inx - 1]
+
+            if prev_lvl_k == lvl_n and prev_fin_k >= fin_n:
+                result.append(n_row)
+                n_inx += 1
+                continue
+
+            result.append(k_row)
+            k_inx += 1
+
+        remain_k = key_w[k_inx:]
+        remain_n = n_key_w[n_inx:]
+
+        if remain_k:
+            result.extend(remain_k)
+        elif remain_n:
+            result.extend(remain_n)
+
         return pd.DataFrame(result, columns=cols).astype(types)
 
     @staticmethod
@@ -250,7 +257,7 @@ class WallBuilder:
 
             concated.extend([bottom, obj, top])
 
-        return pd.concat(concated).drop(columns="sort_key").reset_index(names="sort_key")
+        return pd.concat(concated)
 
     @classmethod
     def set_works_sequence(cls, works: pd.DataFrame) -> pd.DataFrame:
@@ -265,22 +272,40 @@ class WallBuilder:
         cols = works.columns
         wall = pd.DataFrame(columns=cols)
         local_constructs = BlockSeparator.split_by_construct(works)
+        point_object_blocks = []
 
-        for local_construct in local_constructs:
+        for _inx, local_construct in enumerate(local_constructs):
             point_obj_filter = local_construct["is_point_object"]
             key_work_filter = local_construct["is_key_oper"]
 
             point_obj = local_construct[point_obj_filter]
             non_key_works = local_construct[~key_work_filter]
+            lvl_df = local_construct[["id", "level"]]
 
-            blocks = cls._df_blocks_to_dict(local_construct[(~point_obj_filter) & (key_work_filter)])
+            if not point_obj.empty:
+                point_object_blocks.append(point_obj.sort_values(["start_p", "level"]))
+
+            key_works = (
+                local_construct[(~point_obj_filter) & (key_work_filter)]
+                .reset_index(drop=True)
+                .assign(level=lambda df: df.level.rank(method="dense"))
+            )
+
+            blocks = cls._df_blocks_to_dict(key_works)
 
             local_wall = (
                 pd.DataFrame(Wall(blocks).build(), columns=cols)
+                .merge(lvl_df, how="inner", on="id", suffixes=(None, "_old"))
+                .assign(level=lambda df: df.level_old)
+                .drop(columns="level_old")
                 .pipe(cls._insert_non_key_works, non_key_works.sort_values(["level", "start_p"]))
-                .pipe(cls._insert_point_objects, point_obj.sort_values(["start_p", "level"]))
             )
+
             wall = pd.concat([wall, local_wall], ignore_index=True)
+
+        if point_object_blocks:
+            point_objects = pd.concat(point_object_blocks)
+            wall = cls._insert_point_objects(wall, point_objects.sort_values(["start_p", "level"]))
 
         return wall.reset_index(names="sort_key")
 
