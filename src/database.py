@@ -19,7 +19,7 @@ ASYNC_DATABASE_URL = db_config.get_async_db_url()
 SESSION_TIMEOUT = 30
 
 
-pool = ConnectionPool(DATABASE_URL, min_size=5, max_size=50)
+pool = ConnectionPool(DATABASE_URL, min_size=5, max_size=50, max_wait=30, max_lifetime=600, max_idle=300)
 
 
 def get_session() -> Generator[Connection, None, None]:

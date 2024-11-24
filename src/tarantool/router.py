@@ -46,7 +46,12 @@ def load_data(
 
 
 @upload_router.post("/clear-table/")
-def clear_table(session_id: Annotated[str, Body()], table_name: Annotated[str, Body()]):
+def clear_table(
+    session_id: Annotated[str, Body()],
+    table_name: Annotated[str, Body()],
+    user: User = Depends(current_verified_user),
+    auth_header: APIKeyHeader = Depends(auth_header),
+):
     session = session_manager.sessions.get(session_id, None)
     if not session:
         return HTTPException(404, "session not found")
@@ -57,11 +62,18 @@ def clear_table(session_id: Annotated[str, Body()], table_name: Annotated[str, B
 
 
 @upload_router.post("/start/", response_description="return session id", response_class=PlainTextResponse)
-def start_upload():
+def start_upload(
+    user: User = Depends(current_verified_user),
+    auth_header: APIKeyHeader = Depends(auth_header),
+):
     return session_manager.create()
 
 
 @upload_router.post("/complete/", response_class=PlainTextResponse)
-def complete_upload(session_id: Annotated[str, Body()]):
+def complete_upload(
+    session_id: Annotated[str, Body()],
+    user: User = Depends(current_verified_user),
+    auth_header: APIKeyHeader = Depends(auth_header),
+):
     session_manager.complete(session_id)
     return f"{session_id} complete"
