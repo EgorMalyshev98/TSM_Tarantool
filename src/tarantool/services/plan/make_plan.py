@@ -85,7 +85,7 @@ class TarantoolService:
 
         return {
             "columns": opers_with_res.columns.to_list(),
-            "data": opers_with_res.to_numpy().tolist(),
+            "data": opers_with_res.fillna("").to_numpy().tolist(),
         }
 
 

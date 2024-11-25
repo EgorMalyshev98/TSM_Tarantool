@@ -211,36 +211,49 @@ params = [
             [6, 3, 3, 20, 40, 33.3, False, False],
             [7, 1, 1, 40, 50, 25, True, False],
             [8, 2, 3, 40, 50, 16.7, False, False],
+            [9, 1, 3, 50, 70, 33.3, False, False],
         ],
     ),
-    # # example 11
-    # ([
-    #     [1, 1, 0, 60, 100, True, False],
-    #     [2, 2, 0, 25, 100, False, False],
-    #     [2, 3, 25, 70, 100, False, False],
-    #     [2, 4, 70, 100, 100, False, False],
-    #     [2, 5, 50, 100, 100, True, False],
-    #     [2, 6, 100, 120, 100, False, False],
-    # ],
-    # [
-    #     [0, 1, 1, 0, 50, 83.3, True, False],
-    #     [1, 2, 2, 0, 25, 100, False, False],
-    #     [2, 2, 3, 25, 50, 55.6, False, False],
-    #     [3, 1, 1, 50, 60, 16.7, True, False],
-    #     [4, 2, 5, 50, 60, 20, True, False],
-    #     [5, 2, 3, 50, 60, 22.2, False, False],
-    #     [6, 1, 5, 60, 100, 80, True, False],
-    #     [7, 1, 3, 60, 70, 22.2, False, False],
-    #     [8, 1, 4, 70, 100, 100, False, False],
-    #     [9, 1, 6, 100, 120, 100, False, False],
-    # ])
+    # example 11
+    (
+        [
+            [1, 1, 0, 60, 100, True, False],
+            [2, 2, 0, 25, 100, False, False],
+            [2, 3, 25, 70, 100, False, False],
+            [2, 4, 70, 100, 100, False, False],
+            [2, 5, 50, 100, 100, True, False],
+            [2, 6, 100, 120, 100, False, False],
+        ],
+        [
+            [0, 1, 1, 0, 50, 83.3, True, False],
+            [1, 2, 2, 0, 25, 100, False, False],
+            [2, 2, 3, 25, 50, 55.6, False, False],
+            [3, 1, 1, 50, 60, 16.7, True, False],
+            [4, 2, 5, 50, 60, 20, True, False],
+            [5, 2, 3, 50, 60, 22.2, False, False],
+            [6, 1, 5, 60, 100, 80, True, False],
+            [7, 1, 3, 60, 70, 22.2, False, False],
+            [8, 1, 4, 70, 100, 100, False, False],
+            [9, 1, 6, 100, 120, 100, False, False],
+        ],
+    ),
 ]
+
+DTYPES = {
+    "finish_p": float,
+    "id": int,
+    "is_key_oper": bool,
+    "is_point_object": bool,
+    "level": int,
+    "start_p": float,
+    "volume_p": float,
+}
 
 
 @pytest.mark.parametrize("input_data, expected_data", params)
 def test_sort_by_technology(input_data, expected_data):
     input_cols = ["level", "id", "start_p", "finish_p", "volume_p", "is_key_oper", "is_point_object"]
-    input_df = pd.DataFrame(input_data, columns=input_cols)
+    input_df = pd.DataFrame(input_data, columns=input_cols).astype(DTYPES)
 
     result_input_df = WallBuilder.set_works_sequence(input_df)
     # округляем значения столбца volume_p до десятых
@@ -253,39 +266,17 @@ def test_sort_by_technology(input_data, expected_data):
 
 
 if __name__ == "__main__":
-    input_df, out = (
-        [
-            [1, 1, 10, 40, 100, True, False],
-            [2, 2, 10, 50, 100, True, False],
-            [3, 3, 45, 45, 100, True, True],
-            [4, 4, 45, 45, 100, True, True],
-            [5, 5, 25, 47, 100, False, False],
-            [5, 6, 10, 15, 100, True, False],
-            [5, 7, 15, 50, 100, True, False],
-            [6, 8, 10, 20, 100, True, False],
-            [6, 9, 20, 40, 100, True, False],
-        ],
-        [
-            [0, 1.0, 1, 10, 40, 100.0, True, False],
-            [1, 2.0, 2, 10, 40, 75.0, True, False],
-            [2, 3.0, 6, 10, 15, 100.0, True, False],
-            [3, 3.0, 7, 15, 40, 71.4, True, False],
-            [4, 4.0, 8, 10, 20, 100.0, True, False],
-            [5, 4.0, 9, 20, 40, 100.0, True, False],
-            [6, 3.0, 5, 25, 40, 68.2, False, False],
-            [7, 1.0, 2, 40, 45, 12.5, True, False],
-            [10, 4.0, 7, 40, 45, 14.3, True, False],
-            [11, 4.0, 5, 40, 45, 22.7, False, False],
-            [8, 2.0, 3, 45, 45, 100.0, True, True],
-            [9, 3.0, 4, 45, 45, 100.0, True, True],
-            [12, 1.0, 2, 45, 50, 12.5, True, False],
-            [13, 2.0, 7, 45, 50, 14.3, True, False],
-            [14, 2.0, 5, 45, 47, 9.1, False, False],
-        ],
-    )
+    input_df = [
+        [1, 1, 10, 50, 100, True, False],
+        [2, 2, 10, 40, 100, True, False],
+        [3, 3, 10, 70, 100, False, False],
+        [3, 4, 10, 20, 100, True, False],
+    ]
 
     input_cols = ["level", "id", "start_p", "finish_p", "volume_p", "is_key_oper", "is_point_object"]
     in_df = pd.DataFrame(input_df, columns=input_cols)
+
     out_df = result_input_df = WallBuilder.set_works_sequence(in_df)
+    # out_df.loc[:, "volume_p"] = out_df.volume_p.round(1)
 
     pprint(out_df.to_numpy().tolist())

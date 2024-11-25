@@ -124,19 +124,18 @@ class BlockSeparator:
         works = (
             works.sort_values(["level", "start_p"])
             .assign(prev_fin=lambda x: x.groupby("level")["finish_p"].shift(1).fillna(x.start_p))
-            .assign(last_block=lambda x: x.reset_index().groupby("level")["index"].transform("max"))
+            .assign(last_block=lambda x: x.reset_index().groupby(["is_key_oper", "level"])["index"].transform("max"))
+            .assign(first_block=lambda x: x.reset_index().groupby(["is_key_oper", "level"])["index"].transform("min"))
         )
 
         spaces_filter = works["start_p"] > works["prev_fin"]
-        # non_key_filter = (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"] is False)
-        (works["start_p"] < works["prev_fin"]) & (works["is_key_oper"])
-        last_block_filter = works.index == works["last_block"]
-
         spaced_points = works[spaces_filter][["start_p", "prev_fin"]].to_numpy().flatten().tolist()
-        last_block_points = works[last_block_filter]["finish_p"].to_numpy().flatten().tolist()
-        # non_key_opers = non_key_filter[non_key_filter].to_numpy().flatten().tolist()
 
-        return sorted({*spaced_points, *last_block_points})
+        last_block_points = works[works["is_key_oper"]].groupby("level")["finish_p"].max().tolist()
+        first_block_points = works[works["is_key_oper"]].groupby("level")["start_p"].min().tolist()
+        last_point = float(works["finish_p"].max())
+
+        return sorted({*spaced_points, *last_block_points, *first_block_points, last_point})
 
     @staticmethod  # TODO numba
     def _numba_split_blocks(works: np.ndarray, split_points: list):
@@ -270,7 +269,8 @@ class WallBuilder:
         """
 
         cols = works.columns
-        wall = pd.DataFrame(columns=cols)
+        types = works.dtypes.to_dict()
+        wall = pd.DataFrame(columns=cols).astype(types)
         local_constructs = BlockSeparator.split_by_construct(works)
         point_object_blocks = []
 
@@ -295,19 +295,21 @@ class WallBuilder:
 
             local_wall = (
                 pd.DataFrame(Wall(blocks).build(), columns=cols)
+                .astype(types)
                 .merge(lvl_df, how="inner", on="id", suffixes=(None, "_old"))
                 .assign(level=lambda df: df.level_old)
                 .drop(columns="level_old")
                 .pipe(cls._insert_non_key_works, non_key_works.sort_values(["level", "start_p"]))
+                .dropna(how="all", axis=1)
             )
-
-            wall = pd.concat([wall, local_wall], ignore_index=True)
+            print(local_wall)
+            wall = pd.concat([wall if not wall.empty else None, local_wall], ignore_index=True)
 
         if point_object_blocks:
             point_objects = pd.concat(point_object_blocks)
             wall = cls._insert_point_objects(wall, point_objects.sort_values(["start_p", "level"]))
 
-        return wall.reset_index(names="sort_key")
+        return wall.reset_index(drop=True).reset_index(names="sort_key")
 
 
 class OperationSelector:
