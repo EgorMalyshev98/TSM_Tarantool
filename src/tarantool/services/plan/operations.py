@@ -170,7 +170,6 @@ class BlockSeparator:
             List[pd.Dataframe]
         """
         split_points = cls._find_split_points(works)
-        logger.debug(split_points)
         out_cols = ["split_point", *works.columns]
         works = works.assign(vol_per_unit=lambda x: (x.volume_p / (x.finish_p - x.start_p))).to_numpy()
         splitted_blocks = cls._numba_split_blocks(works, split_points)
@@ -302,13 +301,11 @@ class WallBuilder:
                 .pipe(cls._insert_non_key_works, non_key_works.sort_values(["level", "start_p"]))
                 .dropna(how="all", axis=1)
             )
-            print(local_wall)
             wall = pd.concat([wall if not wall.empty else None, local_wall], ignore_index=True)
 
         if point_object_blocks:
             point_objects = pd.concat(point_object_blocks)
             wall = cls._insert_point_objects(wall, point_objects.sort_values(["start_p", "level"]))
-
         return wall.reset_index(drop=True).reset_index(names="sort_key")
 
 
@@ -334,6 +331,7 @@ class OperationSelector:
                     'picket_start' (float): начало участка.
                     'picket_finish' (float): конец участка.
                     'vol_prd' (float): объем работ по проекту.
+                    'is_point_object' bool: точечный объект
 
         Returns:
             pd.DataFrame: объем работ на заданном пикетажном участке.
@@ -342,7 +340,6 @@ class OperationSelector:
         pikets.loc[:, ["input_start", "input_fin"]] = start, finish
 
         vol_per_unit = pikets["vol_prd"] / (pikets["picket_finish"] - pikets["picket_start"])
-
         df = self._calculate_volume(
             pikets["picket_start"],
             pikets["picket_finish"],
@@ -352,6 +349,7 @@ class OperationSelector:
         )
         df = df.add_suffix("_p", axis=1)
         pikets = pd.concat([pikets, df], axis=1)
+        pikets.loc[pikets.is_point_object, "volume_p"] = pikets[pikets.is_point_object]["vol_prd"]
         mask = pikets["volume_p"] > 0
         pikets = pikets[mask]
 
@@ -462,9 +460,9 @@ class OperationSelector:
             "construct_name",
         ]
 
-        operations = self._select_pikets(input_start, input_fin, self.prd.copy()).merge(
-            self.technology, how="left", on="operation_type"
-        )
+        operations = self.prd.merge(self.technology, how="left", on="operation_type")
+
+        operations = self._select_pikets(input_start, input_fin, operations)
 
         dop_cols_df = operations[dop_cols]
 
