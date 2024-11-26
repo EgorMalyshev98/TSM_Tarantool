@@ -11,7 +11,17 @@ from src.tarantool.services.plan.resources import TechRequire
 
 class LoaderService:
     @staticmethod
-    def get_plan_source_data(input_areas: List[List[int]]) -> PlanSources:
+    def _set_works_dict(areas: List[List[int]], df: pd.DataFrame):
+        if df.empty:
+            return {(start, fin): df for start, fin in areas}
+
+        return {
+            (start, fin): local_df.drop(columns=["input_start", "input_fin"])
+            for (start, fin), local_df in df.groupby(["input_start", "input_fin"])
+        }
+
+    @classmethod
+    def get_plan_source_data(cls, input_areas: List[List[int]]) -> PlanSources:
         """получение данных из хранилища для формирования плана работ
         Args:
             input_areas (List[List[int]]): вводные участки: [[начало, окончание]]
@@ -21,21 +31,36 @@ class LoaderService:
         """
         with pool.connection() as conn:
             query = Query(conn)
-            prd = (
-                pd.concat([query.get_prd(start, finish) for start, finish in input_areas])
+
+            # TODO вынести в отдельный метод
+            prd_df = (
+                pd.concat(
+                    [
+                        (query.get_prd(start, finish).assign(input_start=start).assign(input_fin=finish))
+                        for start, finish in input_areas
+                    ]
+                )
                 .drop_duplicates("id")
                 .reset_index(drop=True)
             )
 
-            fact = (
-                pd.concat([query.get_fact(start, finish) for start, finish in input_areas])
+            fact_df = (
+                pd.concat(
+                    [
+                        (query.get_fact(start, finish).assign(input_start=start).assign(input_fin=finish))
+                        for start, finish in input_areas
+                    ]
+                )
                 .drop_duplicates("id")
                 .reset_index(drop=True)
             )
+
+            prd_dict = cls._set_works_dict(input_areas, prd_df)
+            fact_dict = cls._set_works_dict(input_areas, fact_df)
 
             return PlanSources(
-                prd=prd,
-                fact=fact,
+                prd=prd_dict,
+                fact=fact_dict,
                 contract=query.get_contract(),
                 technology=query.get_technology(),
                 norms=query.get_norm(),
@@ -89,21 +114,12 @@ class TarantoolService:
         }
 
 
-# if __name__ == "__main__":
-#     areas = [[1500, 1600]]
-#     data = LoaderService.get_plan_source_data(areas)
-#     selector = OperationSelector(data)
-#     start, finish = areas[0]
+if __name__ == "__main__":
+    areas = [[0, 200], [1500, 1700]]
+    data = LoaderService.get_plan_source_data(areas)
+    selector = OperationSelector(data)
+    start, finish = areas[0]
 
-#     prd = data.prd.copy().merge(data.technology, how="left", on="operation_type")
+    df = selector.select(start, finish)
 
-#     point_objects = prd[prd["is_point_object"] is True].rename(
-#         columns={"picket_start": "start_p", "picket_finish": "finish_p"}
-#     )
-#     base_operations = prd[prd["is_point_object"] is False]
-#     base_operations = selector._select_pikets(start, finish, base_operations)
-#     key_operations = base_operations[base_operations["is_key_oper"] is True].drop(columns="is_key_oper")
-#     non_key_operations = base_operations[base_operations["is_key_oper"] is False].drop(columns="is_key_oper")
-
-#     cols = ["level", "start_p", "finish_p"]
-#     print(point_objects.columns, key_operations.columns, non_key_operations[cols], sep="\n")
+    print(df.describe())

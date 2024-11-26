@@ -247,7 +247,6 @@ class WallBuilder:
             return wall
 
         concated = []
-
         for start, obj in point_objects.groupby("start_p"):
             inx = wall[wall["start_p"] == start].index.min()
             top = wall.iloc[inx:]
@@ -311,8 +310,8 @@ class WallBuilder:
 
 class OperationSelector:
     def __init__(self, data: PlanSources, builder: WallBuilder = WallBuilder):
-        self.prd = data.prd
-        self.fact_df = data.fact
+        self.prd_dict = data.prd
+        self.fact_dict = data.fact
         self.contract = data.contract
         self.technology = data.technology
         self.builder = builder
@@ -460,15 +459,17 @@ class OperationSelector:
             "construct_name",
         ]
 
-        operations = self.prd.merge(self.technology, how="left", on="operation_type")
+        prd = self.prd_dict[(input_start, input_fin)]
+        fact = self.fact_dict[(input_start, input_fin)]
 
+        operations = prd.merge(self.technology, how="left", on="operation_type")
         operations = self._select_pikets(input_start, input_fin, operations)
 
         dop_cols_df = operations[dop_cols]
 
         operations = self.builder.set_works_sequence(operations[used_cols]).merge(dop_cols_df, how="left", on="id")
 
-        operations.loc[:, "volume_f"] = self._add_fact(operations.copy(), self.fact_df.copy())
+        operations.loc[:, "volume_f"] = self._add_fact(operations.copy(), fact.copy())
         operations.loc[:, "vol_remain"] = operations["volume_p"] - operations["volume_f"]
         operations.loc[:, "cost_remain"] = self._add_cost(operations[["num_con", "vol_remain"]], self.contract.copy())
 

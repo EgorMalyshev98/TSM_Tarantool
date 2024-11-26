@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any, Dict, List
 
 import pandas as pd
 from pydantic import BaseModel
@@ -29,8 +29,8 @@ class UploadTable(BaseModel):
 
 @dataclass(frozen=True)
 class PlanSources:
-    prd: pd.DataFrame
-    fact: pd.DataFrame
+    prd: Dict[str, pd.DataFrame]
+    fact: Dict[str, pd.DataFrame]
     contract: pd.DataFrame
     norms: pd.DataFrame
     technology: pd.DataFrame
