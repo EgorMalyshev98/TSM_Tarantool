@@ -1,3 +1,4 @@
+from pprint import pprint
 from typing import List
 
 import pandas as pd
@@ -12,13 +13,14 @@ from src.tarantool.services.plan.resources import TechRequire
 class LoaderService:
     @staticmethod
     def _set_works_dict(areas: List[List[int]], df: pd.DataFrame):
-        if df.empty:
-            return {(start, fin): df for start, fin in areas}
+        areas_dict = {}
 
-        return {
-            (start, fin): local_df.drop(columns=["input_start", "input_fin"])
-            for (start, fin), local_df in df.groupby(["input_start", "input_fin"])
-        }
+        for start, finish in areas:
+            mask = (df.input_start == start) & (df.input_fin == finish)
+            local_df = df[mask].drop(columns=["input_start", "input_fin"])
+            areas_dict[(start, finish)] = local_df
+
+        return areas_dict
 
     @classmethod
     def get_plan_source_data(cls, input_areas: List[List[int]]) -> PlanSources:
@@ -57,6 +59,7 @@ class LoaderService:
 
             prd_dict = cls._set_works_dict(input_areas, prd_df)
             fact_dict = cls._set_works_dict(input_areas, fact_df)
+            pprint(fact_dict)
 
             return PlanSources(
                 prd=prd_dict,
@@ -115,7 +118,7 @@ class TarantoolService:
 
 
 if __name__ == "__main__":
-    areas = [[0, 200], [1500, 1700]]
+    areas = [[0, 200], [1500, 1700], [9700, 11100]]
     data = LoaderService.get_plan_source_data(areas)
     selector = OperationSelector(data)
     start, finish = areas[0]
