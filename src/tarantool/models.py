@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 
 import pandas as pd
-from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -14,16 +13,13 @@ class Area(BaseModel):
     @classmethod
     def value_check(cls, v: float):
         if v < 0:
-            raise HTTPException(status_code=422, detail=f"Пикет не должнен быть отрицательным: {v}")
+            raise ValueError(f"Пикет не должнен быть отрицательным: {v}")
         return v
 
     @model_validator(mode="after")
     def check_range(self):
         if self.finish <= self.start:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Окончание участка ({self.start}, {self.finish}) должно быть больше, чем начало",
-            )
+            raise ValueError(f"Окончание участка ({self.start}, {self.finish}) должно быть больше, чем начало")
         return self
 
 
