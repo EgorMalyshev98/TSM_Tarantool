@@ -13,13 +13,13 @@ class Area(BaseModel):
     @classmethod
     def value_check(cls, v: float):
         if v < 0:
-            raise ValueError(f"Пикет не должнен быть отрицательным: {v}")
+            raise ValueError("Пикет не должнен быть отрицательным")
         return v
 
     @model_validator(mode="after")
     def check_range(self):
         if self.finish <= self.start:
-            raise ValueError(f"Окончание участка ({self.start}, {self.finish}) должно быть больше, чем начало")
+            raise ValueError("Окончание участка должно быть больше, чем начало")
         return self
 
 
