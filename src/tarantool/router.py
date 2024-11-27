@@ -22,9 +22,9 @@ def plan(
     auth_header: APIKeyHeader = Depends(auth_header),
 ):
     """Получить план работ на заданных участках"""
+
     areas = [[area.start, area.finish] for area in oper_plan.areas]
     num_days = oper_plan.num_days
-
     data = LoaderService.get_plan_source_data(areas)  # TODO Dependency injection
     service = TarantoolService(data)  # TODO Dependency injection
 
