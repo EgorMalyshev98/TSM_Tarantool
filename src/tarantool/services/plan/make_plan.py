@@ -1,4 +1,3 @@
-from pprint import pprint
 from typing import List
 
 import pandas as pd
@@ -34,32 +33,8 @@ class LoaderService:
         with pool.connection() as conn:
             query = Query(conn)
 
-            # TODO вынести в отдельный метод
-            prd_df = (
-                pd.concat(
-                    [
-                        (query.get_prd(start, finish).assign(input_start=start).assign(input_fin=finish))
-                        for start, finish in input_areas
-                    ]
-                )
-                .drop_duplicates("id")
-                .reset_index(drop=True)
-            )
-
-            fact_df = (
-                pd.concat(
-                    [
-                        (query.get_fact(start, finish).assign(input_start=start).assign(input_fin=finish))
-                        for start, finish in input_areas
-                    ]
-                )
-                .drop_duplicates("id")
-                .reset_index(drop=True)
-            )
-
-            prd_dict = cls._set_works_dict(input_areas, prd_df)
-            fact_dict = cls._set_works_dict(input_areas, fact_df)
-            pprint(fact_dict)
+            prd_dict = {(start, finish): query.get_prd(start, finish) for start, finish in input_areas}
+            fact_dict = {(start, finish): query.get_fact(start, finish) for start, finish in input_areas}
 
             return PlanSources(
                 prd=prd_dict,
@@ -118,7 +93,7 @@ class TarantoolService:
 
 
 if __name__ == "__main__":
-    areas = [[0, 200], [1500, 1700], [9700, 11100]]
+    areas = [[0, 5], [5, 10]]
     data = LoaderService.get_plan_source_data(areas)
     selector = OperationSelector(data)
     start, finish = areas[0]
