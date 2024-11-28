@@ -76,15 +76,23 @@ class TarantoolService:
         opers.loc[:, "sort_key"] = opers.index
         return opers[self.cols]
 
-    # def create_plan(self, input_areas: List[List[int]]):
-    #     opers = self._get_operations_plan(input_areas)
+    def _first(self: pd.DataFrame):
+        self.iloc[1:] = pd.NA
+        return self
 
-    #     return {"columns": opers.columns.to_list(), "data": opers.to_numpy().tolist()}
+    @classmethod
+    def _drop_duplicates(cls, df: pd.DataFrame, group_cols: List[str], drop_cols: List[str]) -> pd.DataFrame:
+        df.loc[:, drop_cols] = df.groupby(group_cols)[drop_cols].transform(cls._first)
+        return df
 
     def create_plan(self, input_areas: List[List[int]], num_days: int):
         opers = self._get_operations_plan(input_areas)
         req_workload = self.tech_require.require_workload(opers)
-        opers_with_res = self.tech_require.workload_constrain(req_workload, num_days)
+        opers_with_res = self.tech_require.workload_constrain(req_workload, num_days).pipe(
+            self._drop_duplicates,
+            group_cols=["sort_key"],
+            drop_cols=["volume_p", "volume_f", "vol_remain", "cost_remain"],
+        )
 
         return {
             "columns": opers_with_res.columns.to_list(),
@@ -93,11 +101,8 @@ class TarantoolService:
 
 
 if __name__ == "__main__":
-    areas = [[0, 5], [5, 10]]
+    areas = [[5, 10]]
     data = LoaderService.get_plan_source_data(areas)
-    selector = OperationSelector(data)
-    start, finish = areas[0]
+    service = TarantoolService(data)
 
-    df = selector.select(start, finish)
-
-    print(df.describe())
+    plan = service.create_plan(areas, 1)
