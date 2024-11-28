@@ -107,23 +107,35 @@ class TarantoolService:
         opers.loc[:, "sort_key"] = opers.index
         return opers[self.cols]
 
-    def _first(self: pd.DataFrame):
-        self.iloc[1:] = pd.NA
-        return self
+    @staticmethod
+    def _first(df: pd.DataFrame):
+        df.iloc[1:] = pd.NA
+        return df
 
     @classmethod
     def _drop_duplicates(cls, df: pd.DataFrame, group_cols: List[str], drop_dub_cols: List[str]) -> pd.DataFrame:
         df.loc[:, drop_dub_cols] = df.groupby(group_cols)[drop_dub_cols].transform(cls._first)
         return df
 
+    @staticmethod
+    def _set_point_obj_start_finish(df: pd.DataFrame):
+        df.loc[df.is_point_object, ["input_start", "input_finish"]] = df[df.is_point_object][["start_p", "finish_p"]]
+
+        return df
+
     def create_plan(self, input_areas: List[List[int]], num_days: int):
         opers = self._get_operations_plan(input_areas)
         req_workload = self.tech_require.require_workload(opers)
-        opers_with_res = self.tech_require.workload_constrain(req_workload, num_days).pipe(
-            self._drop_duplicates,
-            group_cols=["sort_key"],
-            drop_dub_cols=["volume_p", "volume_f", "vol_remain", "cost_remain"],
-        )[self.out_cols_sequence]
+        opers_with_res = (
+            self.tech_require.workload_constrain(req_workload, num_days)
+            .pipe(
+                self._drop_duplicates,
+                group_cols=["sort_key"],
+                drop_dub_cols=["volume_p", "volume_f", "vol_remain", "cost_remain"],
+            )
+            .pipe(self._set_point_obj_start_finish)
+            .loc[:, [self.out_cols_sequence]]
+        )
 
         return {
             "columns": opers_with_res.columns.to_list(),
