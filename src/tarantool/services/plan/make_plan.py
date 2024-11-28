@@ -134,7 +134,7 @@ class TarantoolService:
                 drop_dub_cols=["volume_p", "volume_f", "vol_remain", "cost_remain"],
             )
             .pipe(self._set_point_obj_start_finish)
-            .loc[:, [self.out_cols_sequence]]
+            .loc[:, self.out_cols_sequence]
         )
 
         return {
