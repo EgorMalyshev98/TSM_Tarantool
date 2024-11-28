@@ -67,6 +67,37 @@ class TarantoolService:
             "work_name",
             "is_key_oper",
             "is_point_object",
+            "input_start",
+            "input_finish",
+            "global_level",
+        ]
+        self.out_cols_sequence = [
+            "num_con",
+            "operation_type",
+            "start_p",
+            "finish_p",
+            "volume_p",
+            "volume_f",
+            "vol_remain",
+            "level",
+            "cost_remain",
+            "sort_key",
+            "unit",
+            "construct_type",
+            "construct_name",
+            "work_name",
+            "is_key_oper",
+            "is_point_object",
+            "technique_type",
+            "require_workload",
+            "id",
+            "date",
+            "technique_name",
+            "workload_limit",
+            "cum_workload",
+            "global_level",
+            "input_start",
+            "input_finish",
         ]
 
     def _get_operations_plan(self, input_areas: List[List[int]]):
@@ -81,8 +112,8 @@ class TarantoolService:
         return self
 
     @classmethod
-    def _drop_duplicates(cls, df: pd.DataFrame, group_cols: List[str], drop_cols: List[str]) -> pd.DataFrame:
-        df.loc[:, drop_cols] = df.groupby(group_cols)[drop_cols].transform(cls._first)
+    def _drop_duplicates(cls, df: pd.DataFrame, group_cols: List[str], drop_dub_cols: List[str]) -> pd.DataFrame:
+        df.loc[:, drop_dub_cols] = df.groupby(group_cols)[drop_dub_cols].transform(cls._first)
         return df
 
     def create_plan(self, input_areas: List[List[int]], num_days: int):
@@ -91,8 +122,8 @@ class TarantoolService:
         opers_with_res = self.tech_require.workload_constrain(req_workload, num_days).pipe(
             self._drop_duplicates,
             group_cols=["sort_key"],
-            drop_cols=["volume_p", "volume_f", "vol_remain", "cost_remain"],
-        )
+            drop_dub_cols=["volume_p", "volume_f", "vol_remain", "cost_remain"],
+        )[self.out_cols_sequence]
 
         return {
             "columns": opers_with_res.columns.to_list(),

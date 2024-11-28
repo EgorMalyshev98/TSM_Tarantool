@@ -1,3 +1,4 @@
+from pprint import pprint
 from typing import Dict, List
 
 import numpy as np
@@ -336,14 +337,14 @@ class OperationSelector:
             pd.DataFrame: объем работ на заданном пикетажном участке.
         """
 
-        pikets.loc[:, ["input_start", "input_fin"]] = start, finish
+        pikets.loc[:, ["input_start", "input_finish"]] = start, finish
 
         vol_per_unit = pikets["vol_prd"] / (pikets["picket_finish"] - pikets["picket_start"])
         df = self._calculate_volume(
             pikets["picket_start"],
             pikets["picket_finish"],
             pikets["input_start"],
-            pikets["input_fin"],
+            pikets["input_finish"],
             vol_per_unit,
         )
         df = df.add_suffix("_p", axis=1)
@@ -457,6 +458,9 @@ class OperationSelector:
             "unit",
             "construct_type",
             "construct_name",
+            "input_start",
+            "input_finish",
+            "level",
         ]
 
         prd = self.prd_dict[(input_start, input_fin)]
@@ -465,12 +469,12 @@ class OperationSelector:
         operations = prd.merge(self.technology, how="left", on="operation_type")
         operations = self._select_pikets(input_start, input_fin, operations)
 
-        dop_cols_df = operations[dop_cols]
+        dop_cols_df = operations[dop_cols].rename(columns={"level": "global_level"})
 
         operations = self.builder.set_works_sequence(operations[used_cols]).merge(dop_cols_df, how="left", on="id")
 
         operations.loc[:, "volume_f"] = self._add_fact(operations.copy(), fact.copy())
         operations.loc[:, "vol_remain"] = operations["volume_p"] - operations["volume_f"]
         operations.loc[:, "cost_remain"] = self._add_cost(operations[["num_con", "vol_remain"]], self.contract.copy())
-
+        pprint(operations.columns.to_list())
         return operations
