@@ -119,7 +119,9 @@ class TarantoolService:
 
     @staticmethod
     def _set_point_obj_start_finish(df: pd.DataFrame):
-        df.loc[df.is_point_object, ["input_start", "input_finish"]] = df[df.is_point_object][["start_p", "finish_p"]]
+        df.loc[df.is_point_object, ["input_start", "input_finish"]] = df[df.is_point_object][
+            ["start_p", "finish_p"]
+        ].to_numpy()
 
         return df
 
